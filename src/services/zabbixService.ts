@@ -8,7 +8,7 @@ export interface ZabbixHost {
   name: string;
   host: string;
   status: 'enabled' | 'disabled';
-  available: 'online' | 'offline';
+  available: 'online' | 'offline' | 'unknown';
   ip: string;
   dns: string;
   groups: string[];
@@ -29,7 +29,7 @@ export interface ZabbixMetric {
   hostName: string;
   hostHost?: string;
   hostStatus?: 'enabled' | 'disabled';
-  hostAvailable?: 'online' | 'offline';
+  hostAvailable?: 'online' | 'offline' | 'unknown';
   hostIp?: string;
   itemId: string;
   name: string;

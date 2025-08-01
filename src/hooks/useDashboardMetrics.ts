@@ -13,11 +13,13 @@ export const useDashboardMetrics = () => {
   const hostMetrics = useMemo(() => {
     const online = hosts.filter(h => h.available === 'online').length;
     const offline = hosts.filter(h => h.available === 'offline').length;
+    const unknown = hosts.filter(h => h.available === 'unknown').length;
     const total = hosts.length;
     
     return {
       online,
       offline,
+      unknown,
       total,
       onlinePercentage: total > 0 ? Math.round((online / total) * 100) : 0
     };

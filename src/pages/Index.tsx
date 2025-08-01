@@ -34,9 +34,12 @@ const Index = () => {
     id: host.id,
     name: host.name,
     ip: host.ip,
-    status: host.available === 'online' ? 'online' as const : 'offline' as const,
-    uptime: host.available === 'online' ? 'Online' : 'Offline',
-    lastSeen: host.available === 'offline' ? 'Indisponível' : undefined,
+    status: host.available === 'online' ? 'online' as const : 
+           host.available === 'offline' ? 'offline' as const : 'unknown' as const,
+    uptime: host.available === 'online' ? 'Online' : 
+           host.available === 'offline' ? 'Offline' : 'Status Desconhecido',
+    lastSeen: host.available === 'offline' ? 'Indisponível' : 
+             host.available === 'unknown' ? 'Status Desconhecido' : undefined,
   })) || [];
 
   const alerts = zabbixAlerts || [];

@@ -22,6 +22,22 @@ export const RealTimeChart: React.FC<RealTimeChartProps> = ({
   unit = '',
   color = 'hsl(var(--primary))'
 }) => {
+  // Early return if no itemId is provided
+  if (!itemId) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+            Nenhum dado disponível para este gráfico
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Calculate time range
   const getTimeRange = () => {
     const now = Math.floor(Date.now() / 1000);

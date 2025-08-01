@@ -55,12 +55,12 @@ export const MetricsOverview: React.FC = () => {
   // Encontrar item ID para gráficos (primeiro CPU encontrado)
   const getCpuItemForChart = () => {
     const cpuMetrics = metricGroups.cpu || [];
-    return cpuMetrics[0]?.itemId || '';
+    return cpuMetrics.length > 0 ? cpuMetrics[0]?.itemId || '' : '';
   };
 
   const getMemoryItemForChart = () => {
     const memoryMetrics = metricGroups.memory || [];
-    return memoryMetrics[0]?.itemId || '';
+    return memoryMetrics.length > 0 ? memoryMetrics[0]?.itemId || '' : '';
   };
 
   if (error) {
@@ -219,7 +219,8 @@ export const MetricsOverview: React.FC = () => {
                     lastUpdate={metric.lastUpdate}
                     hostInfo={{
                       name: metric.hostName,
-                      status: metric.hostAvailable === 'online' ? 'online' : 'offline',
+                      status: metric.hostAvailable === 'online' ? 'online' : 
+                             metric.hostAvailable === 'offline' ? 'offline' : 'unknown',
                       ip: metric.hostIp
                     }}
                     status={

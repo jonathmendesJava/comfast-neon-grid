@@ -16,7 +16,7 @@ interface EnhancedMetricCardProps {
   subtitle?: string;
   hostInfo?: {
     name: string;
-    status: 'online' | 'offline';
+    status: 'online' | 'offline' | 'unknown';
     ip?: string;
   };
 }
@@ -114,7 +114,10 @@ export const EnhancedMetricCard: React.FC<EnhancedMetricCardProps> = ({
         
         {hostInfo && (
           <div className="flex items-center gap-2 mb-2">
-            <Badge variant={hostInfo.status === 'online' ? 'default' : 'destructive'}>
+            <Badge variant={
+              hostInfo.status === 'online' ? 'default' : 
+              hostInfo.status === 'offline' ? 'destructive' : 'secondary'
+            }>
               {hostInfo.status}
             </Badge>
             <span className="text-xs text-muted-foreground">

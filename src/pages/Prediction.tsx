@@ -128,7 +128,8 @@ export default function Prediction() {
                       <SelectItem key={host.id} value={host.id}>
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${
-                            host.available === 'online' ? 'bg-status-online' : 'bg-status-offline'
+                            host.available === 'online' ? 'bg-status-online' : 
+                            host.available === 'offline' ? 'bg-status-offline' : 'bg-status-unknown'
                           }`} />
                           {host.name} ({host.host})
                         </div>
@@ -139,8 +140,12 @@ export default function Prediction() {
               </div>
               
               {selectedHostData && (
-                <Badge variant={selectedHostData.available === 'online' ? 'outline' : 'destructive'}>
-                  {selectedHostData.available === 'online' ? 'Online' : 'Offline'}
+                <Badge variant={
+                  selectedHostData.available === 'online' ? 'outline' : 
+                  selectedHostData.available === 'offline' ? 'destructive' : 'secondary'
+                }>
+                  {selectedHostData.available === 'online' ? 'Online' : 
+                   selectedHostData.available === 'offline' ? 'Offline' : 'Desconhecido'}
                 </Badge>
               )}
             </div>

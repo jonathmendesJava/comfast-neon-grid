@@ -50,6 +50,7 @@ All colors MUST be HSL.
     --status-online: 150 84% 56%;
     --status-offline: 0 84% 60%;
     --status-warning: 45 100% 60%;
+    --status-unknown: 43 74% 49%;
 
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--neon-green)), hsl(var(--neon-green-light)));
@@ -197,6 +198,10 @@ All colors MUST be HSL.
 
   .status-warning {
     color: hsl(var(--status-warning));
+  }
+
+  .status-unknown {
+    color: hsl(var(--status-unknown));
   }
 
   /* Futuristic Button */
