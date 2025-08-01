@@ -8,35 +8,59 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Futuristic Network Dashboard - Main Theme */
+    --background: 0 0% 0.4%; /* Almost black #010101 */
+    --foreground: 150 100% 88%; /* Bright green for text */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 0 0% 3%; /* Dark card background */
+    --card-foreground: 150 100% 88%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 5%;
+    --popover-foreground: 150 100% 88%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 150 84% 56%; /* Neon green #28F3A4 */
+    --primary-foreground: 0 0% 2%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 150 88% 64%; /* Lighter neon green #1AF7AE */
+    --secondary-foreground: 0 0% 2%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 0 0% 8%;
+    --muted-foreground: 150 30% 60%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 150 84% 56%;
+    --accent-foreground: 0 0% 2%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 150 30% 15%; /* Dark green border */
+    --input: 0 0% 8%;
+    --ring: 150 84% 56%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+
+    /* Custom Dashboard Colors */
+    --neon-green: 150 84% 56%; /* #28F3A4 */
+    --neon-green-light: 150 88% 64%; /* #1AF7AE */
+    --dark-bg: 0 0% 0.4%; /* #010101 */
+    --card-bg: 0 0% 3%;
+    --border-glow: 150 84% 56%;
+    
+    /* Status Colors */
+    --status-online: 150 84% 56%;
+    --status-offline: 0 84% 60%;
+    --status-warning: 45 100% 60%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--neon-green)), hsl(var(--neon-green-light)));
+    --gradient-card: linear-gradient(145deg, hsl(var(--card-bg)), hsl(0 0% 4%));
+    
+    /* Glows and Effects */
+    --glow-primary: 0 0 20px hsl(var(--neon-green) / 0.3);
+    --glow-secondary: 0 0 30px hsl(var(--neon-green) / 0.2);
+    --shadow-card: 0 8px 32px hsl(0 0% 0% / 0.8);
+
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -100,6 +124,108 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-mono antialiased;
+    background-image: url('/src/assets/dashboard-bg.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+  
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: hsl(var(--dark-bg) / 0.85);
+    z-index: -1;
+  }
+}
+
+@layer components {
+  /* Dashboard Card Component */
+  .dashboard-card {
+    @apply bg-card border border-border rounded-xl p-6 shadow-lg;
+    background: var(--gradient-card);
+    box-shadow: var(--shadow-card), inset 0 1px 0 hsl(var(--border-glow) / 0.1);
+  }
+
+  /* Neon Glow Effect */
+  .neon-glow {
+    box-shadow: var(--glow-primary);
+  }
+
+  .neon-glow-subtle {
+    box-shadow: var(--glow-secondary);
+  }
+
+  /* Metric Cards */
+  .metric-card {
+    @apply dashboard-card hover:border-primary/50 transition-all duration-300;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--gradient-primary);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .metric-card:hover::before {
+    opacity: 1;
+  }
+
+  /* Status Indicators */
+  .status-online {
+    @apply text-primary;
+    color: hsl(var(--status-online));
+  }
+
+  .status-offline {
+    @apply text-destructive;
+    color: hsl(var(--status-offline));
+  }
+
+  .status-warning {
+    color: hsl(var(--status-warning));
+  }
+
+  /* Futuristic Button */
+  .futuristic-btn {
+    @apply relative overflow-hidden rounded-lg px-6 py-3 font-medium transition-all duration-300;
+    background: var(--gradient-primary);
+    color: hsl(var(--primary-foreground));
+    box-shadow: var(--glow-primary);
+  }
+
+  .futuristic-btn:hover {
+    box-shadow: var(--glow-secondary);
+    transform: translateY(-2px);
+  }
+
+  /* Chat Button */
+  .chat-button {
+    @apply fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center;
+    @apply border border-primary/30 backdrop-blur-sm transition-all duration-300;
+    @apply hover:border-primary hover:scale-110;
+    background: hsl(var(--card-bg) / 0.8);
+    box-shadow: var(--glow-primary);
+  }
+
+  /* Grid Animation */
+  .grid-pattern {
+    background-image: 
+      linear-gradient(hsl(var(--border-glow) / 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border-glow) / 0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
   }
 }
