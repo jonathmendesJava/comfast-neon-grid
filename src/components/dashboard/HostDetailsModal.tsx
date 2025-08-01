@@ -169,7 +169,7 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-3">
             <div className={`p-2 rounded-lg ${
@@ -193,7 +193,8 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
           </DialogTitle>
         </DialogHeader>
 
-        <div className="overflow-y-auto">
+        <ScrollArea className="flex-1 h-full">
+          <div className="p-1">
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
               <LoadingSpinner />
@@ -245,7 +246,7 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
               )}
               
               {/* Conteúdo principal dos dados */}
-            <Tabs defaultValue="overview" className="w-full">
+            <Tabs defaultValue="overview" className="w-full flex flex-col">
               <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="overview">Visão Geral</TabsTrigger>
                 <TabsTrigger value="metrics">Métricas Detalhadas</TabsTrigger>
@@ -254,7 +255,8 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                 <TabsTrigger value="graphs">Gráficos</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="overview" className="space-y-6">
+              <div className="flex-1">
+              <TabsContent value="overview" className="space-y-6 mt-4">
                 {/* Status Geral e Métricas Principais */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="dashboard-card border-l-4 border-l-primary">
@@ -463,7 +465,7 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                 )}
               </TabsContent>
 
-              <TabsContent value="metrics" className="space-y-6">
+              <TabsContent value="metrics" className="space-y-6 mt-4">
                 <div className="dashboard-card">
                   <h4 className="font-semibold mb-4 flex items-center gap-2 text-lg">
                     <Activity className="w-5 h-5 text-primary" />
@@ -541,7 +543,7 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                 )}
               </TabsContent>
 
-              <TabsContent value="items" className="space-y-6">
+              <TabsContent value="items" className="space-y-6 mt-4">
                 {/* Filtros e Busca */}
                 <div className="dashboard-card">
                   <div className="flex items-center justify-between mb-4">
@@ -604,8 +606,8 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                             </div>
                           </div>
                           
-                           <ScrollArea className="h-[400px]">
-                             <div className="grid gap-3 pr-4">
+                           <ScrollArea className="h-[350px] w-full">
+                             <div className="space-y-3 pr-3">
                              {categoryItems.map((item) => (
                               <div key={item.itemid} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg hover:bg-muted/30 transition-colors">
                                 <div className="flex-1 min-w-0">
@@ -671,8 +673,8 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                             </div>
                           </div>
                           
-                           <ScrollArea className="h-[400px]">
-                             <div className="overflow-x-auto pr-4">
+                           <ScrollArea className="h-[350px] w-full">
+                             <div className="pr-3">
                              <table className="w-full text-sm">
                               <thead>
                                 <tr className="border-b border-border">
@@ -718,7 +720,7 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                 )}
               </TabsContent>
 
-              <TabsContent value="alerts" className="space-y-4">
+              <TabsContent value="alerts" className="space-y-4 mt-4">
                 <div className="dashboard-card">
                   <h4 className="font-medium mb-4 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4" />
@@ -759,7 +761,7 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                 </div>
               </TabsContent>
 
-              <TabsContent value="graphs" className="space-y-4">
+              <TabsContent value="graphs" className="space-y-4 mt-4">
                 <div className="dashboard-card">
                   <h4 className="font-medium mb-4">Gráficos</h4>
                   <div className="text-center py-8 text-muted-foreground">
@@ -768,10 +770,12 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                   </div>
                 </div>
               </TabsContent>
+              </div>
             </Tabs>
             </>
           ) : null}
-        </div>
+          </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
