@@ -306,168 +306,61 @@ class ZabbixAPI {
   }
 
   async getHostDetails(hostId: string): Promise<any> {
-    console.log(`Fetching details for host: ${hostId}`)
-    
-    // Validate and convert hostId
-    const numericHostId = Number(hostId)
-    if (!hostId || hostId === 'undefined' || hostId === 'null' || isNaN(numericHostId)) {
-      console.error(`Invalid hostId: ${hostId}`)
-      throw new Error(`Invalid hostId: ${hostId}`)
-    }
-
-    console.log(`Making host.get request for hostId: ${numericHostId}`)
-    
-    // Get host basic information
-    const hostResponse = await this.makeRequest('host.get', {
-      output: ['hostid', 'name', 'host', 'status', 'available'],
-      selectInterfaces: ['interfaceid', 'main', 'type', 'useip', 'ip', 'dns', 'port'],
-      selectGroups: ['name'],
-      selectParentTemplates: ['name'],
-      hostids: [numericHostId]
-    })
-
-    console.log(`Host response:`, JSON.stringify(hostResponse, null, 2))
-
-    if (!hostResponse || hostResponse.length === 0) {
-      console.error(`Host not found for ID: ${numericHostId}`)
-      throw new Error(`Host with ID ${numericHostId} not found`)
-    }
-
-    const host = hostResponse[0]
-    console.log(`Found host: ${host.name}`)
-
-    // Get items with safe parameters first
-    console.log(`Getting items for host: ${numericHostId}`)
-    let itemsResponse
+    console.log(`Getting host details for: ${hostId}`)
     
     try {
-      // First attempt: safe parameters without units and status
-      itemsResponse = await this.makeRequest('item.get', {
-        output: ['itemid', 'name', 'key_', 'lastvalue', 'lastclock'],
-        hostids: [numericHostId],
-        monitored: true,
-        webitems: false,
-        sortfield: 'name'
+      await this.authenticate()
+
+      // Use exactly the same request structure as the user's working example
+      const itemsRequest: ZabbixRequest = {
+        jsonrpc: '2.0',
+        method: 'item.get',
+        params: {
+          hostids: hostId, // String format as in user's example
+          output: ['itemid', 'name', 'key_', 'lastvalue', 'lastclock'],
+          sortfield: 'name'
+        },
+        auth: this.authToken,
+        id: this.requestId++
+      }
+
+      console.log('Making Zabbix request: item.get')
+      
+      const response = await fetch(`${this.baseUrl}api_jsonrpc.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json-rpc' },
+        body: JSON.stringify(itemsRequest)
       })
-      console.log(`✅ Items loaded successfully with safe parameters: ${itemsResponse?.length || 0} items`)
-    } catch (error) {
-      console.warn(`⚠️ Safe parameters failed, trying fallback with extend...`)
-      
-      try {
-        // Fallback: use extend output
-        itemsResponse = await this.makeRequest('item.get', {
-          hostids: [numericHostId],
-          output: 'extend'
-        })
-        console.log(`✅ Items loaded with fallback: ${itemsResponse?.length || 0} items`)
-      } catch (fallbackError) {
-        console.error(`❌ Both attempts failed:`, fallbackError)
-        throw new Error(`Unable to load items for host ${numericHostId}`)
-      }
-    }
 
-    console.log(`Items response count: ${itemsResponse?.length || 0}`)
-
-    // Get active alerts for this host
-    const alertsResponse = await this.makeRequest('trigger.get', {
-      output: ['triggerid', 'description', 'priority', 'status', 'lastchange', 'value'],
-      hostids: [numericHostId],
-      monitored: true,
-      active: true,
-      expandDescription: true,
-      sortfield: 'priority',
-      sortorder: 'DESC'
-    })
-
-    // Format items like Zabbix Recent data
-    const items = (itemsResponse || []).map((item: any) => {
-      const lastValue = item.lastvalue || 'No data'
-      const units = item.units || ''
-      const lastClock = item.lastclock ? new Date(parseInt(item.lastclock) * 1000) : null
-      
-      // Format value with units (like Zabbix)
-      let formattedValue = lastValue
-      if (lastValue !== 'No data' && units) {
-        if (units === 'bps' && !isNaN(lastValue)) {
-          const bps = parseFloat(lastValue)
-          formattedValue = `${bps.toFixed(4)} bps`
-        } else if (units === 'pps' && !isNaN(lastValue)) {
-          const pps = parseFloat(lastValue)
-          formattedValue = `${pps.toFixed(4)} pps`
-        } else if (item.key_.includes('ifAdminStatus') || item.key_.includes('ifOperStatus')) {
-          // Status items (1=up, 2=down, etc.)
-          const statusMap: { [key: string]: string } = {
-            '1': 'up (1)',
-            '2': 'down (2)',
-            '3': 'testing (3)'
-          }
-          formattedValue = statusMap[lastValue] || `unknown (${lastValue})`
-        } else {
-          formattedValue = `${lastValue}${units ? ' ' + units : ''}`
-        }
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
+      const data: ZabbixResponse = await response.json()
+      
+      if (data.error) {
+        throw new Error(`Zabbix API error: ${data.error.message}`)
+      }
+
+      const items = data.result || []
+      console.log(`Found ${items.length} items`)
+
+      // Return exactly as Zabbix provides, minimal formatting
       return {
-        itemid: item.itemid,
-        name: item.name,
-        key: item.key_,
-        lastvalue: formattedValue,
-        rawValue: lastValue,
-        lastclock: lastClock?.toISOString() || null,
-        lastCheckFormatted: lastClock ? lastClock.toLocaleString() : 'Never',
-        units: units,
-        status: item.status === '0' ? 'active' : 'disabled',
-        applications: item.applications?.map((app: any) => app.name) || [],
-        type: this.getMetricType(item.key_)
+        hostId,
+        items: items.map(item => ({
+          itemid: item.itemid,
+          name: item.name,
+          key_: item.key_,
+          lastvalue: item.lastvalue,
+          lastclock: item.lastclock
+        })),
+        generatedAt: new Date().toISOString()
       }
-    })
 
-    // Format alerts
-    const alerts = (alertsResponse || []).map((trigger: any) => ({
-      id: trigger.triggerid,
-      name: trigger.description,
-      severity: this.mapPriority(trigger.priority),
-      status: trigger.value === '1' ? 'active' : 'resolved',
-      lastChange: trigger.lastchange ? new Date(parseInt(trigger.lastchange) * 1000).toISOString() : null
-    }))
-
-    // Calculate operational status
-    const adminStatusItems = items.filter(item => item.key.includes('ifAdminStatus'))
-    const operStatusItems = items.filter(item => item.key.includes('ifOperStatus'))
-    
-    const operationalStatus = {
-      adminStatus: adminStatusItems.length > 0 ? adminStatusItems[0].rawValue : 'unknown',
-      operStatus: operStatusItems.length > 0 ? operStatusItems[0].rawValue : 'unknown',
-      lastStatusChange: items.find(item => item.key.includes('ifOperStatus'))?.lastclock || null
-    }
-
-    // Calculate uptime (if available from system.uptime item)
-    const uptimeItem = items.find(item => 
-      item.key.includes('system.uptime') || item.key.includes('uptime')
-    )
-    const uptime = uptimeItem ? parseInt(uptimeItem.rawValue || '0') : 0
-
-    return {
-      id: host.hostid,
-      name: host.name || host.host,
-      host: host.host,
-      status: host.status === '0' ? 'enabled' : 'disabled',
-      available: host.available === '1' ? 'online' : host.available === '2' ? 'offline' : 'unknown',
-      ip: host.interfaces?.[0]?.ip || 'N/A',
-      dns: host.interfaces?.[0]?.dns || 'N/A',
-      uptime: uptime,
-      lastCheck: new Date().toISOString(),
-      groups: host.groups?.map((g: any) => g.name) || [],
-      templates: host.parentTemplates?.map((t: any) => t.name) || [],
-      interfaces: host.interfaces || [],
-      items: items,
-      alerts: alerts,
-      operationalStatus: operationalStatus,
-      checks: {
-        total: items.length,
-        active: items.filter((item: any) => item.status === 'active').length,
-        alerts: alerts.filter((alert: any) => alert.status === 'active').length
-      }
+    } catch (error) {
+      console.error('Error getting host details:', error)
+      throw error
     }
   }
 
