@@ -1,8 +1,10 @@
 import { Cpu, HardDrive, Network, Activity, Clock, Server } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { EnhancedMetricCard } from "@/components/dashboard/EnhancedMetricCard";
 import { HostStatusCard } from "@/components/dashboard/HostStatusCard";
 import { AlertsCard } from "@/components/dashboard/AlertsCard";
+import { MetricsOverview } from "@/components/dashboard/MetricsOverview";
 import { ChartPlaceholder } from "@/components/dashboard/ChartPlaceholder";
 import { ChatButton } from "@/components/dashboard/ChatButton";
 import { Footer } from "@/components/dashboard/Footer";
@@ -34,55 +36,10 @@ const Index = () => {
       
       {/* Main Dashboard Content */}
       <main className="container mx-auto px-6 py-8 space-y-8">
-        {/* Métricas Principais */}
+        {/* Enhanced Metrics Overview */}
         <section>
-          <h2 className="text-xl font-semibold mb-6 text-foreground">Métricas em Tempo Real</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {metricsLoading ? (
-              <div className="metric-card flex items-center justify-center">
-                <LoadingSpinner />
-              </div>
-            ) : metricsError ? (
-              <div className="metric-card flex items-center justify-center text-destructive">
-                Erro: {metricsError.message}
-              </div>
-            ) : (
-              <>
-                <MetricCard
-                  title="CPU Média"
-                  value={zabbixMetrics?.find(m => m.type === 'cpu')?.value || '0'}
-                  unit="%"
-                  icon={Cpu}
-                  trend="stable"
-                  status="normal"
-                />
-                <MetricCard
-                  title="Memória RAM"
-                  value={zabbixMetrics?.find(m => m.type === 'memory')?.value || '0'}
-                  unit="%"
-                  icon={HardDrive}
-                  trend="stable"
-                  status="normal"
-                />
-                <MetricCard
-                  title="Ping Médio"
-                  value={zabbixMetrics?.find(m => m.type === 'ping')?.value || '0'}
-                  unit="ms"
-                  icon={Network}
-                  trend="stable"
-                  status="normal"
-                />
-                <MetricCard
-                  title="Hosts Online"
-                  value={hosts.filter(h => h.status === 'online').length.toString()}
-                  unit={`/${hosts.length}`}
-                  icon={Activity}
-                  trend="stable"
-                  status="normal"
-                />
-              </>
-            )}
-          </div>
+          <h2 className="text-xl font-semibold mb-6 text-foreground">Visão Geral das Métricas</h2>
+          <MetricsOverview />
         </section>
 
         {/* Status dos Hosts e Alertas */}
@@ -114,46 +71,64 @@ const Index = () => {
           </div>
         </section>
 
-        {/* Gráficos e Análises */}
+        {/* Legacy Metrics for Comparison */}
         <section>
-          <h2 className="text-xl font-semibold mb-6 text-foreground">Análises e Tendências</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            <ChartPlaceholder
-              title="Uso de CPU"
-              type="line"
-              description="Últimas 24 horas"
-              height={250}
-            />
-            <ChartPlaceholder
-              title="Tráfego de Rede"
-              type="area"
-              description="Entrada vs Saída"
-              height={250}
-            />
-            <ChartPlaceholder
-              title="Distribuição de Alertas"
-              type="donut"
-              description="Por severidade"
-              height={250}
-            />
-            <ChartPlaceholder
-              title="Performance por Host"
-              type="bar"
-              description="Comparativo mensal"
-              height={250}
-            />
-            <ChartPlaceholder
-              title="Disponibilidade"
-              type="line"
-              description="SLA mensal"
-              height={250}
-            />
-            <ChartPlaceholder
-              title="Uso de Recursos"
-              type="bar"
-              description="CPU, RAM, Disco"
-              height={250}
-            />
+          <h2 className="text-xl font-semibold mb-6 text-foreground">Métricas Rápidas</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {metricsLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="metric-card flex items-center justify-center">
+                  <LoadingSpinner />
+                </div>
+              ))
+            ) : metricsError ? (
+              <div className="col-span-full metric-card flex items-center justify-center text-destructive">
+                Erro: {metricsError.message}
+              </div>
+            ) : (
+              <>
+                <EnhancedMetricCard
+                  title="CPU Média"
+                  value={parseFloat(zabbixMetrics?.find(m => m.type === 'cpu')?.value || '0').toFixed(1)}
+                  unit="%"
+                  icon={Cpu}
+                  trend="stable"
+                  status="normal"
+                  isLoading={metricsLoading}
+                  lastUpdate={zabbixMetrics?.find(m => m.type === 'cpu')?.lastUpdate}
+                />
+                <EnhancedMetricCard
+                  title="Memória RAM"
+                  value={parseFloat(zabbixMetrics?.find(m => m.type === 'memory')?.value || '0').toFixed(1)}
+                  unit="%"
+                  icon={HardDrive}
+                  trend="stable"
+                  status="normal"
+                  isLoading={metricsLoading}
+                  lastUpdate={zabbixMetrics?.find(m => m.type === 'memory')?.lastUpdate}
+                />
+                <EnhancedMetricCard
+                  title="Ping Status"
+                  value={zabbixMetrics?.find(m => m.type === 'ping')?.value === '1' ? '100' : '0'}
+                  unit="%"
+                  icon={Network}
+                  trend="stable"
+                  status={zabbixMetrics?.find(m => m.type === 'ping')?.value === '1' ? 'normal' : 'critical'}
+                  isLoading={metricsLoading}
+                  lastUpdate={zabbixMetrics?.find(m => m.type === 'ping')?.lastUpdate}
+                />
+                <EnhancedMetricCard
+                  title="Hosts Online"
+                  value={hosts.filter(h => h.status === 'online').length.toString()}
+                  icon={Activity}
+                  trend="stable"
+                  status={hosts.filter(h => h.status === 'online').length < hosts.length ? "warning" : "normal"}
+                  isLoading={hostsLoading}
+                  subtitle={`${hosts.length} hosts totais`}
+                  lastUpdate={new Date().toISOString()}
+                />
+              </>
+            )}
           </div>
         </section>
 

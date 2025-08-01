@@ -27,12 +27,17 @@ export interface ZabbixAlert {
 export interface ZabbixMetric {
   hostId: string;
   hostName: string;
+  hostHost?: string;
+  hostStatus?: 'enabled' | 'disabled';
+  hostAvailable?: 'online' | 'offline';
+  hostIp?: string;
   itemId: string;
   name: string;
   key: string;
   value: string;
   units: string;
   type: string;
+  lastUpdate?: string;
 }
 
 export interface ZabbixHistoryData {

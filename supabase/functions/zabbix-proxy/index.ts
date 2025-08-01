@@ -160,41 +160,63 @@ class ZabbixAPI {
         await this.authenticate()
       }
 
-      // Get all hosts if no specific IDs provided
+      // Get all hosts with status info if no specific IDs provided
       const hosts = hostIds ? 
         await this.makeRequest('host.get', {
-          output: ['hostid', 'name'],
+          output: ['hostid', 'name', 'host', 'status', 'available'],
+          selectInterfaces: ['ip'],
           hostids: hostIds
         }) :
         await this.makeRequest('host.get', {
-          output: ['hostid', 'name'],
+          output: ['hostid', 'name', 'host', 'status', 'available'],
+          selectInterfaces: ['ip'],
           limit: 10
         })
 
       const metrics = []
 
       for (const host of hosts) {
-        // Get CPU, Memory and Ping items for this host
+        // Get comprehensive system metrics for this host
         const items = await this.makeRequest('item.get', {
-          output: ['itemid', 'name', 'key_', 'lastvalue', 'units'],
+          output: ['itemid', 'name', 'key_', 'lastvalue', 'units', 'lastclock', 'value_type'],
           hostids: host.hostid,
-          search: {
-            key_: 'system.cpu.util,vm.memory.util,icmpping'
+          monitored: true,
+          filter: {
+            value_type: [0, 3] // Numeric values only
           },
-          searchWildcardsEnabled: true,
-          limit: 10
+          limit: 100
         })
 
-        for (const item of items) {
+        // Filter for relevant metrics
+        const relevantItems = items.filter((item: any) => {
+          const key = item.key_.toLowerCase()
+          return key.includes('cpu') || 
+                 key.includes('memory') || 
+                 key.includes('vm.memory') ||
+                 key.includes('ping') ||
+                 key.includes('uptime') ||
+                 key.includes('vfs.fs') ||
+                 key.includes('net.if') ||
+                 key.includes('load') ||
+                 key.includes('proc.num') ||
+                 key.includes('swap')
+        })
+
+        for (const item of relevantItems) {
           metrics.push({
             hostId: host.hostid,
             hostName: host.name,
+            hostHost: host.host,
+            hostStatus: host.status === '0' ? 'enabled' : 'disabled',
+            hostAvailable: host.available === '1' ? 'online' : 'offline',
+            hostIp: host.interfaces?.[0]?.ip || 'N/A',
             itemId: item.itemid,
             name: item.name,
             key: item.key_,
             value: item.lastvalue || '0',
             units: item.units || '',
-            type: this.getMetricType(item.key_)
+            type: this.getMetricType(item.key_),
+            lastUpdate: item.lastclock ? new Date(parseInt(item.lastclock) * 1000).toISOString() : new Date().toISOString()
           })
         }
       }
@@ -244,11 +266,16 @@ class ZabbixAPI {
   }
 
   private getMetricType(key: string): string {
-    if (key.includes('cpu')) return 'cpu'
-    if (key.includes('memory') || key.includes('vm.memory')) return 'memory'
-    if (key.includes('ping')) return 'ping'
-    if (key.includes('net.if')) return 'network'
-    if (key.includes('vfs.fs')) return 'disk'
+    const lowerKey = key.toLowerCase()
+    if (lowerKey.includes('cpu')) return 'cpu'
+    if (lowerKey.includes('memory') || lowerKey.includes('vm.memory')) return 'memory'
+    if (lowerKey.includes('ping') || lowerKey.includes('icmp')) return 'ping'
+    if (lowerKey.includes('net.if')) return 'network'
+    if (lowerKey.includes('vfs.fs') || lowerKey.includes('disk')) return 'disk'
+    if (lowerKey.includes('uptime')) return 'uptime'
+    if (lowerKey.includes('load')) return 'load'
+    if (lowerKey.includes('proc.num')) return 'processes'
+    if (lowerKey.includes('swap')) return 'swap'
     return 'other'
   }
 }
