@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from './LoadingSpinner';
-import { supabase } from '@/integrations/supabase/client';
+import { zabbixService } from '@/services/zabbixService';
 import { Server, Activity, AlertTriangle, CheckCircle, Clock, Globe, Shield, Wifi, WifiOff, Cpu, MemoryStick, HardDrive, Network } from 'lucide-react';
 
 interface Host {
@@ -76,25 +76,7 @@ interface HostDetails {
 
 const fetchHostDetails = async (hostId: string): Promise<HostDetails> => {
   console.log('Fetching host details for:', hostId);
-  
-  const { data, error } = await supabase.functions.invoke('zabbix-proxy', {
-    body: { 
-      action: 'get-host-details',
-      hostId: hostId
-    }
-  });
-
-  if (error) {
-    console.error('Error fetching host details:', error);
-    throw error;
-  }
-  
-  if (!data.success) {
-    console.error('Host details request failed:', data.error);
-    throw new Error(data.error || 'Failed to fetch host details');
-  }
-  
-  return data.data;
+  return zabbixService.getHostDetails(hostId);
 };
 
 export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProps) => {

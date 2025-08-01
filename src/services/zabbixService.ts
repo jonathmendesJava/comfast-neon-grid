@@ -161,6 +161,35 @@ export class ZabbixService {
       throw error;
     }
   }
+
+  /**
+   * Busca detalhes completos de um host específico
+   * @param hostId ID do host
+   * @returns Promise<any> Detalhes do host
+   */
+  async getHostDetails(hostId: string): Promise<any> {
+    try {
+      const { data: result, error } = await supabase.functions.invoke('zabbix-proxy', {
+        body: { 
+          action: 'get-host-details',
+          hostId 
+        }
+      });
+
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`);
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Unknown error from Zabbix proxy');
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Erro ao buscar detalhes do host:', error);
+      throw error;
+    }
+  }
 }
 
 export const zabbixService = new ZabbixService();
