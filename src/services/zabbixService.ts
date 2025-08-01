@@ -215,6 +215,13 @@ export class ZabbixService {
    */
   async getHostDetails(hostId: string): Promise<any> {
     try {
+      console.log(`🔹 ZabbixService: Buscando detalhes do host ${hostId}`);
+      
+      // Validar hostId antes de enviar
+      if (!hostId || hostId === 'undefined' || hostId === 'null') {
+        throw new Error(`Host ID inválido: ${hostId}`);
+      }
+
       const { data: result, error } = await supabase.functions.invoke('zabbix-proxy', {
         body: { 
           action: 'get-host-details',
@@ -223,17 +230,31 @@ export class ZabbixService {
       });
 
       if (error) {
-        throw new Error(`Supabase function error: ${error.message}`);
+        console.error('❌ Erro do Supabase:', error);
+        throw new Error(`Erro de conexão: ${error.message}`);
+      }
+
+      if (!result) {
+        throw new Error('Resposta vazia do servidor');
       }
 
       if (!result.success) {
-        throw new Error(result.error || 'Unknown error from Zabbix proxy');
+        console.error('❌ Erro do Zabbix:', result.error);
+        throw new Error(result.error || 'Erro desconhecido do Zabbix');
       }
 
-      return result.data;
+      console.log(`✅ ZabbixService: Dados do host carregados com sucesso`);
+      return result.data || {};
     } catch (error) {
-      console.error('Erro ao buscar detalhes do host:', error);
-      throw error;
+      console.error('❌ ZabbixService: Erro ao buscar detalhes do host:', error);
+      
+      // Retornar estrutura mínima para evitar quebra do frontend
+      return {
+        host: { name: 'Host indisponível', status: 'unknown' },
+        items: [],
+        alerts: [],
+        error: error instanceof Error ? error.message : 'Erro desconhecido'
+      };
     }
   }
 

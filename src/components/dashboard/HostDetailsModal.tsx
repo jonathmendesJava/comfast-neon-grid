@@ -7,7 +7,8 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { EnhancedMetricCard } from './EnhancedMetricCard';
 import { zabbixService } from '@/services/zabbixService';
 import { useZabbixMetrics } from '@/hooks/useZabbixData';
-import { Server, Activity, AlertTriangle, CheckCircle, Clock, Globe, Shield, Wifi, WifiOff, Cpu, MemoryStick, HardDrive, Network } from 'lucide-react';
+import { Server, Activity, AlertTriangle, CheckCircle, Clock, Globe, Shield, Wifi, WifiOff, Cpu, MemoryStick, HardDrive, Network, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface Host {
   id: string;
@@ -74,6 +75,7 @@ interface HostDetails {
     active: number;
     alerts: number;
   };
+  error?: string; // Propriedade para indicar erros nos dados carregados
 }
 
 const fetchHostDetails = async (hostId: string): Promise<HostDetails> => {
@@ -82,7 +84,7 @@ const fetchHostDetails = async (hostId: string): Promise<HostDetails> => {
 };
 
 export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProps) => {
-  const { data: hostDetails, isLoading, error } = useQuery({
+  const { data: hostDetails, isLoading, error, refetch } = useQuery({
     queryKey: ['host-details', host?.id],
     queryFn: () => fetchHostDetails(host!.id),
     enabled: isOpen && !!host?.id,
@@ -197,15 +199,38 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-64 text-destructive">
               <AlertTriangle className="w-8 h-8 mb-2" />
-              <p className="text-center">
-                Erro ao carregar detalhes do host
-                <br />
-                <span className="text-sm text-muted-foreground">
+              <div className="text-center space-y-2">
+                <p className="font-medium">Erro ao carregar detalhes do host</p>
+                <p className="text-sm text-muted-foreground">
                   {error instanceof Error ? error.message : 'Erro desconhecido'}
-                </span>
-              </p>
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => refetch()}
+                  className="mt-3"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Tentar Novamente
+                </Button>
+              </div>
             </div>
           ) : hostDetails ? (
+            // Verificar se há erro nos dados carregados
+            hostDetails.error ? (
+              <div className="flex flex-col items-center justify-center h-64 text-yellow-600">
+                <AlertTriangle className="w-8 h-8 mb-2" />
+                <div className="text-center space-y-2">
+                  <p className="font-medium">Dados parciais carregados</p>
+                  <p className="text-sm text-muted-foreground">
+                    {hostDetails.error}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Algumas informações podem estar indisponíveis
+                  </p>
+                </div>
+              </div>
+            ) : (
             <Tabs defaultValue="overview" className="w-full">
               <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="overview">Visão Geral</TabsTrigger>
@@ -740,6 +765,7 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                 </div>
               </TabsContent>
             </Tabs>
+            )
           ) : null}
         </div>
       </DialogContent>
