@@ -100,23 +100,44 @@ class ZabbixAPI {
       }
 
       const hosts = await this.makeRequest('host.get', {
-        output: ['hostid', 'host', 'name', 'status', 'available'],
-        selectInterfaces: ['ip', 'dns', 'port'],
+        output: ['hostid', 'name', 'status', 'available'],
+        selectInterfaces: ['interfaceid', 'ip', 'available'],
         selectGroups: ['name'],
         sortfield: 'name'
       })
 
-      return hosts.map((host: any) => ({
-        id: host.hostid,
-        name: host.name || host.host,
-        host: host.host,
-        status: host.status === '0' ? 'enabled' : 'disabled',
-        // Fix: Zabbix available field - '0' = online, '1' = offline, '2' = unknown
-        available: host.available === '0' ? 'online' : 'offline',
-        ip: host.interfaces?.[0]?.ip || 'N/A',
-        dns: host.interfaces?.[0]?.dns || 'N/A',
-        groups: host.groups?.map((g: any) => g.name) || []
-      }))
+      return hosts.map((host: any) => {
+        // Get primary interface for IP and status
+        const primaryInterface = host.interfaces?.[0]
+        const ip = primaryInterface?.ip || 'N/A'
+        
+        // Determine final availability status according to Zabbix standard:
+        // 0 = unknown, 1 = online, 2 = offline
+        let finalAvailable = 'unknown'
+        if (host.available === '1') {
+          finalAvailable = 'online'
+        } else if (host.available === '2') {
+          finalAvailable = 'offline'
+        }
+        
+        // Consider interface status for more precision if available
+        if (primaryInterface?.available === '1') {
+          finalAvailable = 'online'
+        } else if (primaryInterface?.available === '2') {
+          finalAvailable = 'offline'
+        }
+
+        return {
+          id: host.hostid,
+          name: host.name || host.host,
+          host: host.host || host.name,
+          status: host.status === '0' ? 'enabled' : 'disabled',
+          available: finalAvailable,
+          ip: ip,
+          dns: 'N/A',
+          groups: host.groups?.map((g: any) => g.name) || []
+        }
+      })
     } catch (error) {
       console.error('Error fetching hosts:', error)
       throw error
@@ -213,8 +234,8 @@ class ZabbixAPI {
             hostName: host.name,
             hostHost: host.host,
             hostStatus: host.status === '0' ? 'enabled' : 'disabled',
-            // Fix: Zabbix available field - '0' = online, '1' = offline, '2' = unknown
-            hostAvailable: host.available === '0' ? 'online' : 'offline',
+            // Fix: Zabbix available field - '0' = unknown, '1' = online, '2' = offline
+            hostAvailable: host.available === '1' ? 'online' : host.available === '2' ? 'offline' : 'unknown',
             hostIp: host.interfaces?.[0]?.ip || 'N/A',
             itemId: item.itemid,
             name: item.name,
@@ -413,7 +434,7 @@ class ZabbixAPI {
       name: host.name || host.host,
       host: host.host,
       status: host.status === '0' ? 'enabled' : 'disabled',
-      available: host.available === '0' ? 'online' : 'offline',
+      available: host.available === '1' ? 'online' : host.available === '2' ? 'offline' : 'unknown',
       ip: host.interfaces?.[0]?.ip || 'N/A',
       dns: host.interfaces?.[0]?.dns || 'N/A',
       uptime: uptime,

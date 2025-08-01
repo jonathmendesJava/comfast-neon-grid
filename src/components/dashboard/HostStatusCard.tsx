@@ -1,10 +1,10 @@
-import { Server, Wifi, WifiOff } from "lucide-react";
+import { Server, Wifi, WifiOff, HelpCircle } from "lucide-react";
 
 interface Host {
   id: string;
   name: string;
   ip: string;
-  status: "online" | "offline";
+  status: "online" | "offline" | "unknown";
   uptime?: string;
   lastSeen?: string;
 }
@@ -17,6 +17,7 @@ interface HostStatusCardProps {
 export const HostStatusCard = ({ hosts, onHostClick }: HostStatusCardProps) => {
   const onlineHosts = hosts.filter(host => host.status === "online");
   const offlineHosts = hosts.filter(host => host.status === "offline");
+  const unknownHosts = hosts.filter(host => host.status === "unknown");
 
   return (
     <div className="dashboard-card col-span-full lg:col-span-2">
@@ -37,6 +38,10 @@ export const HostStatusCard = ({ hosts, onHostClick }: HostStatusCardProps) => {
             <div className="w-3 h-3 bg-destructive rounded-full" />
             <span className="text-muted-foreground">Offline: {offlineHosts.length}</span>
           </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-muted-foreground rounded-full" />
+            <span className="text-muted-foreground">Unknown: {unknownHosts.length}</span>
+          </div>
         </div>
       </div>
 
@@ -53,12 +58,16 @@ export const HostStatusCard = ({ hosts, onHostClick }: HostStatusCardProps) => {
               <div className={`p-2 rounded-lg ${
                 host.status === "online" 
                   ? "bg-primary/10 text-primary" 
-                  : "bg-destructive/10 text-destructive"
+                  : host.status === "offline"
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-muted/30 text-muted-foreground"
               }`}>
                 {host.status === "online" ? (
                   <Wifi className="w-4 h-4" />
-                ) : (
+                ) : host.status === "offline" ? (
                   <WifiOff className="w-4 h-4" />
+                ) : (
+                  <HelpCircle className="w-4 h-4" />
                 )}
               </div>
               
@@ -72,7 +81,9 @@ export const HostStatusCard = ({ hosts, onHostClick }: HostStatusCardProps) => {
               <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                 host.status === "online"
                   ? "bg-primary/10 text-primary"
-                  : "bg-destructive/10 text-destructive"
+                  : host.status === "offline"
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-muted/30 text-muted-foreground"
               }`}>
                 {host.status.toUpperCase()}
               </div>
