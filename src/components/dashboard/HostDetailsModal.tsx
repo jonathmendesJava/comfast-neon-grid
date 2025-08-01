@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { LoadingSpinner } from './LoadingSpinner';
 import { EnhancedMetricCard } from './EnhancedMetricCard';
 import { zabbixService } from '@/services/zabbixService';
@@ -603,8 +604,9 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                             </div>
                           </div>
                           
-                          <div className="grid gap-3">
-                            {categoryItems.slice(0, 10).map((item) => (
+                           <ScrollArea className="h-[400px]">
+                             <div className="grid gap-3 pr-4">
+                             {categoryItems.map((item) => (
                               <div key={item.itemid} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg hover:bg-muted/30 transition-colors">
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1">
@@ -638,15 +640,9 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                                   )}
                                 </div>
                               </div>
-                            ))}
-                            {categoryItems.length > 10 && (
-                              <div className="text-center py-2">
-                                <Badge variant="outline" className="text-xs">
-                                  +{categoryItems.length - 10} items adicionais
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
+                             ))}
+                             </div>
+                           </ScrollArea>
                         </div>
                       );
                     })}
@@ -675,8 +671,9 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                             </div>
                           </div>
                           
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                           <ScrollArea className="h-[400px]">
+                             <div className="overflow-x-auto pr-4">
+                             <table className="w-full text-sm">
                               <thead>
                                 <tr className="border-b border-border">
                                   <th className="text-left py-2 font-medium">Nome</th>
@@ -702,16 +699,10 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                                     </td>
                                   </tr>
                                 ))}
-                              </tbody>
-                            </table>
-                            {uncategorizedItems.length > 15 && (
-                              <div className="text-center py-3">
-                                <Badge variant="outline" className="text-xs">
-                                  +{uncategorizedItems.length - 15} items adicionais
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
+                               </tbody>
+                             </table>
+                             </div>
+                           </ScrollArea>
                         </div>
                       );
                     })()}
