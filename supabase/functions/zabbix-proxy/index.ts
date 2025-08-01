@@ -277,8 +277,25 @@ serve(async (req) => {
       )
     }
 
-    const url = new URL(req.url)
-    const action = url.searchParams.get('action')
+    // Parse request body for action and parameters
+    let action: string | null = null;
+    let requestData: any = {};
+
+    try {
+      if (req.method === 'POST') {
+        const body = await req.json();
+        action = body.action;
+        requestData = body;
+      } else {
+        // Fallback to URL parameters for GET requests
+        const url = new URL(req.url);
+        action = url.searchParams.get('action');
+      }
+    } catch (error) {
+      // If body parsing fails, try URL parameters
+      const url = new URL(req.url);
+      action = url.searchParams.get('action');
+    }
 
     if (!action) {
       return new Response(
@@ -287,7 +304,7 @@ serve(async (req) => {
       )
     }
 
-    console.log(`Processing action: ${action}`)
+    console.log(`Processing action: ${action}`, requestData)
 
     const zabbix = new ZabbixAPI(ZABBIX_URL, ZABBIX_TOKEN)
 
@@ -303,19 +320,17 @@ serve(async (req) => {
         break
         
       case 'get-metrics':
-        const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {}
-        result = await zabbix.getMetrics(body.hostIds)
+        result = await zabbix.getMetrics(requestData.hostIds)
         break
         
       case 'get-history':
-        const historyBody = req.method === 'POST' ? await req.json().catch(() => ({})) : {}
-        if (!historyBody.itemId || !historyBody.timeFrom || !historyBody.timeTill) {
+        if (!requestData.itemId || !requestData.timeFrom || !requestData.timeTill) {
           return new Response(
             JSON.stringify({ error: 'Missing required parameters: itemId, timeFrom, timeTill' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
-        result = await zabbix.getHistory(historyBody.itemId, historyBody.timeFrom, historyBody.timeTill)
+        result = await zabbix.getHistory(requestData.itemId, requestData.timeFrom, requestData.timeTill)
         break
         
       default:
