@@ -338,7 +338,7 @@ class ZabbixAPI {
     // Get ALL items for this host (like Zabbix Recent data)
     console.log(`Getting items for host: ${hostId}`)
     const itemsResponse = await this.makeRequest('item.get', {
-      output: ['itemid', 'name', 'key_', 'lastvalue', 'lastclock'],
+      output: ['itemid', 'name', 'key_', 'lastvalue', 'lastclock', 'units', 'status'],
       hostids: [hostId],
       monitored: true,
       webitems: false,
@@ -486,8 +486,19 @@ class ZabbixAPI {
       }
 
       // 1️⃣ Ping / Disponibilidade (ICMP Ping)
+      console.log('Searching for ping items...')
       const pingItems = await this.searchItems(hostId, 'icmpping')
+      console.log(`Found ${pingItems.length} ping items`)
+      
+      // Try additional ping patterns if none found
+      if (pingItems.length === 0) {
+        const altPingItems = await this.searchItems(hostId, 'ping')
+        console.log(`Found ${altPingItems.length} alternative ping items`)
+        pingItems.push(...altPingItems)
+      }
+      
       for (const item of pingItems) {
+        console.log(`Getting history for ping item: ${item.itemid} (${item.name})`)
         const history = await this.getItemHistory(item.itemid, timeFrom, now, 3) // history: 3 for integers
         if (history.length > 0) {
           criticalMetrics.ping.push(...history.map(h => ({
@@ -498,8 +509,12 @@ class ZabbixAPI {
       }
 
       // 2️⃣ Latência (ICMP Ping RTT / avg)
+      console.log('Searching for latency items...')
       const latencyItems = await this.searchItems(hostId, 'icmppingsec')
+      console.log(`Found ${latencyItems.length} latency items`)
+      
       for (const item of latencyItems) {
+        console.log(`Getting history for latency item: ${item.itemid} (${item.name})`)
         const history = await this.getItemHistory(item.itemid, timeFrom, now, 0) // history: 0 for floats
         if (history.length > 0) {
           criticalMetrics.latency.push(...history.map(h => ({
@@ -511,21 +526,31 @@ class ZabbixAPI {
 
       // Try alternative latency patterns
       if (criticalMetrics.latency.length === 0) {
-        const altLatencyItems = await this.searchItems(hostId, 'icmppingavg')
-        for (const item of altLatencyItems) {
-          const history = await this.getItemHistory(item.itemid, timeFrom, now, 0)
-          if (history.length > 0) {
-            criticalMetrics.latency.push(...history.map(h => ({
-              timestamp: parseInt(h.clock) * 1000,
-              value: parseFloat(h.value) || 0
-            })))
+        console.log('Trying alternative latency patterns...')
+        const patterns = ['icmppingavg', 'ping_avg', 'ping.avg', 'rtt']
+        for (const pattern of patterns) {
+          const altLatencyItems = await this.searchItems(hostId, pattern)
+          console.log(`Found ${altLatencyItems.length} items for pattern: ${pattern}`)
+          for (const item of altLatencyItems) {
+            const history = await this.getItemHistory(item.itemid, timeFrom, now, 0)
+            if (history.length > 0) {
+              criticalMetrics.latency.push(...history.map(h => ({
+                timestamp: parseInt(h.clock) * 1000,
+                value: parseFloat(h.value) || 0
+              })))
+            }
           }
+          if (criticalMetrics.latency.length > 0) break
         }
       }
 
       // 3️⃣ Uso de CPU
+      console.log('Searching for CPU items...')
       const cpuItems = await this.searchItems(hostId, 'cpu')
+      console.log(`Found ${cpuItems.length} CPU items`)
+      
       for (const item of cpuItems) {
+        console.log(`Getting history for CPU item: ${item.itemid} (${item.name})`)
         const history = await this.getItemHistory(item.itemid, timeFrom, now, 0) // history: 0 for floats
         if (history.length > 0) {
           criticalMetrics.cpu.push(...history.map(h => ({
@@ -537,21 +562,31 @@ class ZabbixAPI {
 
       // Try specific CPU patterns
       if (criticalMetrics.cpu.length === 0) {
-        const systemCpuItems = await this.searchItems(hostId, 'system.cpu.util')
-        for (const item of systemCpuItems) {
-          const history = await this.getItemHistory(item.itemid, timeFrom, now, 0)
-          if (history.length > 0) {
-            criticalMetrics.cpu.push(...history.map(h => ({
-              timestamp: parseInt(h.clock) * 1000,
-              value: parseFloat(h.value) || 0
-            })))
+        console.log('Trying alternative CPU patterns...')
+        const patterns = ['system.cpu.util', 'cpu.util', 'proc.cpu.util', 'cpu_usage']
+        for (const pattern of patterns) {
+          const altCpuItems = await this.searchItems(hostId, pattern)
+          console.log(`Found ${altCpuItems.length} items for CPU pattern: ${pattern}`)
+          for (const item of altCpuItems) {
+            const history = await this.getItemHistory(item.itemid, timeFrom, now, 0)
+            if (history.length > 0) {
+              criticalMetrics.cpu.push(...history.map(h => ({
+                timestamp: parseInt(h.clock) * 1000,
+                value: parseFloat(h.value) || 0
+              })))
+            }
           }
+          if (criticalMetrics.cpu.length > 0) break
         }
       }
 
       // 4️⃣ Uso de Memória
+      console.log('Searching for memory items...')
       const memoryItems = await this.searchItems(hostId, 'memory')
+      console.log(`Found ${memoryItems.length} memory items`)
+      
       for (const item of memoryItems) {
+        console.log(`Getting history for memory item: ${item.itemid} (${item.name})`)
         const history = await this.getItemHistory(item.itemid, timeFrom, now, 0) // history: 0 for floats
         if (history.length > 0) {
           criticalMetrics.memory.push(...history.map(h => ({
@@ -563,15 +598,21 @@ class ZabbixAPI {
 
       // Try specific memory patterns
       if (criticalMetrics.memory.length === 0) {
-        const vmMemoryItems = await this.searchItems(hostId, 'vm.memory.utilization')
-        for (const item of vmMemoryItems) {
-          const history = await this.getItemHistory(item.itemid, timeFrom, now, 0)
-          if (history.length > 0) {
-            criticalMetrics.memory.push(...history.map(h => ({
-              timestamp: parseInt(h.clock) * 1000,
-              value: parseFloat(h.value) || 0
-            })))
+        console.log('Trying alternative memory patterns...')
+        const patterns = ['vm.memory.utilization', 'vm.memory.pused', 'memory.util', 'memory_usage']
+        for (const pattern of patterns) {
+          const altMemoryItems = await this.searchItems(hostId, pattern)
+          console.log(`Found ${altMemoryItems.length} items for memory pattern: ${pattern}`)
+          for (const item of altMemoryItems) {
+            const history = await this.getItemHistory(item.itemid, timeFrom, now, 0)
+            if (history.length > 0) {
+              criticalMetrics.memory.push(...history.map(h => ({
+                timestamp: parseInt(h.clock) * 1000,
+                value: parseFloat(h.value) || 0
+              })))
+            }
           }
+          if (criticalMetrics.memory.length > 0) break
         }
       }
 

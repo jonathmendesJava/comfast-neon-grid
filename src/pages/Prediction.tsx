@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, RefreshCw, Activity, AlertTriangle, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { PredictionCard } from "@/components/dashboard/PredictionCard";
+import { PredictionLoadingCard } from "@/components/dashboard/PredictionLoadingCard";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { LoadingSpinner } from "@/components/dashboard/LoadingSpinner";
 import { useZabbixHosts } from "@/hooks/useZabbixData";
@@ -156,10 +157,14 @@ export default function Prediction() {
           <>
             {/* Prediction Summary */}
             <div className="grid gap-6 mb-6">
-              <PredictionCard 
-                prediction={prediction} 
-                hostName={selectedHostData?.name}
-              />
+              {criticalLoading ? (
+                <PredictionLoadingCard />
+              ) : (
+                <PredictionCard 
+                  prediction={prediction} 
+                  hostName={selectedHostData?.name}
+                />
+              )}
             </div>
 
             <Separator className="my-6" />
