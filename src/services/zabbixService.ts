@@ -51,22 +51,14 @@ export class ZabbixService {
    */
   async getHosts(): Promise<ZabbixHost[]> {
     try {
-      const url = new URL(`${window.location.origin}/functions/v1/zabbix-proxy`);
-      url.searchParams.append('action', 'get-hosts');
-      
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const { data: result, error } = await supabase.functions.invoke('zabbix-proxy', {
+        body: { action: 'get-hosts' }
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`);
       }
 
-      const result = await response.json();
-      
       if (!result.success) {
         throw new Error(result.error || 'Unknown error from Zabbix proxy');
       }
@@ -84,22 +76,14 @@ export class ZabbixService {
    */
   async getAlerts(): Promise<ZabbixAlert[]> {
     try {
-      const url = new URL(`${window.location.origin}/functions/v1/zabbix-proxy`);
-      url.searchParams.append('action', 'get-alerts');
-      
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const { data: result, error } = await supabase.functions.invoke('zabbix-proxy', {
+        body: { action: 'get-alerts' }
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`);
       }
 
-      const result = await response.json();
-      
       if (!result.success) {
         throw new Error(result.error || 'Unknown error from Zabbix proxy');
       }
@@ -118,23 +102,17 @@ export class ZabbixService {
    */
   async getMetrics(hostIds?: string[]): Promise<ZabbixMetric[]> {
     try {
-      const url = new URL(`${window.location.origin}/functions/v1/zabbix-proxy`);
-      url.searchParams.append('action', 'get-metrics');
-      
-      const response = await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ hostIds }),
+      const { data: result, error } = await supabase.functions.invoke('zabbix-proxy', {
+        body: { 
+          action: 'get-metrics',
+          hostIds 
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`);
       }
 
-      const result = await response.json();
-      
       if (!result.success) {
         throw new Error(result.error || 'Unknown error from Zabbix proxy');
       }
@@ -155,23 +133,19 @@ export class ZabbixService {
    */
   async getHistoryData(itemId: string, timeFrom: number, timeTill: number): Promise<ZabbixHistoryData[]> {
     try {
-      const url = new URL(`${window.location.origin}/functions/v1/zabbix-proxy`);
-      url.searchParams.append('action', 'get-history');
-      
-      const response = await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ itemId, timeFrom, timeTill }),
+      const { data: result, error } = await supabase.functions.invoke('zabbix-proxy', {
+        body: { 
+          action: 'get-history',
+          itemId, 
+          timeFrom, 
+          timeTill 
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`);
       }
 
-      const result = await response.json();
-      
       if (!result.success) {
         throw new Error(result.error || 'Unknown error from Zabbix proxy');
       }
