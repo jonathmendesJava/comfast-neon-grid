@@ -345,13 +345,14 @@ class ZabbixAPI {
       const items = data.result || []
       console.log(`Found ${items.length} items`)
 
-      // Return exactly as Zabbix provides, minimal formatting
+      // Return exactly as Zabbix provides, but map key_ to key for frontend compatibility
       return {
         hostId,
         items: items.map(item => ({
           itemid: item.itemid,
           name: item.name,
-          key_: item.key_,
+          key: item.key_, // Map key_ to key for frontend
+          key_: item.key_, // Keep original for compatibility
           lastvalue: item.lastvalue,
           lastclock: item.lastclock
         })),
