@@ -469,7 +469,7 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                 <div className="dashboard-card">
                   <h4 className="font-semibold mb-4 flex items-center gap-2 text-lg">
                     <Activity className="w-5 h-5 text-primary" />
-                    Métricas Detalhadas do Host
+                    Métricas por Categoria
                   </h4>
                   <p className="text-sm text-muted-foreground mb-4">
                     Visualização detalhada das métricas coletadas especificamente para este host.
@@ -481,57 +481,54 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                     <LoadingSpinner />
                   </div>
                 ) : hostMetrics && Object.keys(hostMetricGroups).length > 0 ? (
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {Object.entries(hostMetricGroups).map(([type, typeMetrics]: [string, any]) => (
-                      <div key={type} className="dashboard-card">
-                        <h5 className="font-semibold capitalize mb-4 flex items-center gap-2">
-                          {getMetricIcon(type)}
-                          {type === 'cpu' ? 'CPU & Processamento' :
-                           type === 'memory' ? 'Memória' :
-                           type === 'disk' ? 'Armazenamento' :
-                           type === 'network' ? 'Rede' :
-                           type === 'system' ? 'Sistema' : type}
-                          <Badge variant="outline" className="text-xs">
-                            {typeMetrics.length} métricas
-                          </Badge>
-                        </h5>
-                        <div className="space-y-3">
-                          {typeMetrics.slice(0, 6).map((metric: any) => (
-                            <EnhancedMetricCard
-                              key={metric.itemId}
-                              title={metric.name}
-                              value={parseFloat(metric.value || '0').toFixed(1)}
-                              unit={metric.units}
-                              icon={
-                                type === 'cpu' ? Cpu :
-                                type === 'memory' ? MemoryStick :
-                                type === 'disk' ? HardDrive :
-                                type === 'network' ? Network :
-                                Activity
-                              }
-                              lastUpdate={metric.lastUpdate}
-                              status={
-                                type === 'cpu' && parseFloat(metric.value || '0') > 80 ? 'critical' :
-                                type === 'memory' && parseFloat(metric.value || '0') > 85 ? 'critical' :
-                                type === 'cpu' && parseFloat(metric.value || '0') > 60 ? 'warning' :
-                                type === 'memory' && parseFloat(metric.value || '0') > 70 ? 'warning' :
-                                'normal'
-                              }
-                              trend="stable"
-                              subtitle={`${metric.hostName} - ${metric.hostIp}`}
-                            />
-                          ))}
-                          {typeMetrics.length > 6 && (
-                            <div className="text-center py-2">
-                              <Badge variant="outline" className="text-xs">
-                                +{typeMetrics.length - 6} métricas adicionais
-                              </Badge>
-                            </div>
-                          )}
+                  <ScrollArea className="h-[600px] w-full">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 pr-3">
+                      {Object.entries(hostMetricGroups).map(([type, typeMetrics]: [string, any]) => (
+                        <div key={type} className="dashboard-card">
+                          <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg sticky top-0 z-10 backdrop-blur-sm mb-4">
+                            {getMetricIcon(type)}
+                            <h5 className="font-semibold capitalize">
+                              {type === 'cpu' ? 'CPU & Processamento' :
+                               type === 'memory' ? 'Memória' :
+                               type === 'disk' ? 'Armazenamento' :
+                               type === 'network' ? 'Rede' :
+                               type === 'system' ? 'Sistema' : type}
+                            </h5>
+                            <Badge variant="outline" className="text-xs ml-auto">
+                              {typeMetrics.length} métricas
+                            </Badge>
+                          </div>
+                          <div className="space-y-3">
+                            {typeMetrics.map((metric: any) => (
+                              <EnhancedMetricCard
+                                key={metric.itemId}
+                                title={metric.name}
+                                value={parseFloat(metric.value || '0').toFixed(1)}
+                                unit={metric.units}
+                                icon={
+                                  type === 'cpu' ? Cpu :
+                                  type === 'memory' ? MemoryStick :
+                                  type === 'disk' ? HardDrive :
+                                  type === 'network' ? Network :
+                                  Activity
+                                }
+                                lastUpdate={metric.lastUpdate}
+                                status={
+                                  type === 'cpu' && parseFloat(metric.value || '0') > 80 ? 'critical' :
+                                  type === 'memory' && parseFloat(metric.value || '0') > 85 ? 'critical' :
+                                  type === 'cpu' && parseFloat(metric.value || '0') > 60 ? 'warning' :
+                                  type === 'memory' && parseFloat(metric.value || '0') > 70 ? 'warning' :
+                                  'normal'
+                                }
+                                trend="stable"
+                                subtitle={`${metric.hostName} - ${metric.hostIp}`}
+                              />
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 ) : (
                   <div className="dashboard-card">
                     <div className="text-center py-12 text-muted-foreground">
@@ -606,7 +603,7 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                             </div>
                           </div>
                           
-                           <ScrollArea className="h-[350px] w-full">
+                           <ScrollArea className="h-[500px] w-full">
                              <div className="space-y-3 pr-3">
                              {categoryItems.map((item) => (
                               <div key={item.itemid} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg hover:bg-muted/30 transition-colors">
