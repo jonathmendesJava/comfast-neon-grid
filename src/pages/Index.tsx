@@ -6,37 +6,26 @@ import { AlertsCard } from "@/components/dashboard/AlertsCard";
 import { ChartPlaceholder } from "@/components/dashboard/ChartPlaceholder";
 import { ChatButton } from "@/components/dashboard/ChatButton";
 import { Footer } from "@/components/dashboard/Footer";
+import { useZabbixHosts, useZabbixAlerts, useZabbixMetrics } from "@/hooks/useZabbixData";
+import { LoadingSpinner } from "@/components/dashboard/LoadingSpinner";
 
 const Index = () => {
-  // Mock data - será substituído por dados reais da API do Zabbix
-  const mockHosts = [
-    { id: "1", name: "Servidor Principal", ip: "192.168.1.100", status: "online" as const, uptime: "15d 4h 30m" },
-    { id: "2", name: "Firewall Corporativo", ip: "192.168.1.1", status: "online" as const, uptime: "30d 12h 15m" },
-    { id: "3", name: "Switch Core", ip: "192.168.1.10", status: "online" as const, uptime: "45d 8h 22m" },
-    { id: "4", name: "Access Point WiFi", ip: "192.168.1.20", status: "offline" as const, lastSeen: "2h atrás" },
-    { id: "5", name: "Servidor Backup", ip: "192.168.1.101", status: "online" as const, uptime: "7d 16h 45m" },
-  ];
+  // Hooks para dados reais do Zabbix
+  const { data: zabbixHosts, isLoading: hostsLoading, error: hostsError } = useZabbixHosts();
+  const { data: zabbixAlerts, isLoading: alertsLoading, error: alertsError } = useZabbixAlerts();
+  const { data: zabbixMetrics, isLoading: metricsLoading, error: metricsError } = useZabbixMetrics();
 
-  const mockAlerts = [
-    {
-      id: "1",
-      title: "Alto uso de CPU",
-      description: "Servidor Principal com CPU acima de 90% por mais de 5 minutos",
-      severity: "high" as const,
-      timestamp: "há 15 minutos",
-      host: "Servidor Principal",
-      acknowledged: false
-    },
-    {
-      id: "2",
-      title: "Conectividade perdida",
-      description: "Access Point WiFi não responde ao ping",
-      severity: "critical" as const,
-      timestamp: "há 2 horas",
-      host: "Access Point WiFi",
-      acknowledged: false
-    }
-  ];
+  // Mapear dados do Zabbix para o formato esperado pelos componentes
+  const hosts = zabbixHosts?.map(host => ({
+    id: host.id,
+    name: host.name,
+    ip: host.ip,
+    status: host.available === 'online' ? 'online' as const : 'offline' as const,
+    uptime: host.available === 'online' ? 'Online' : 'Offline',
+    lastSeen: host.available === 'offline' ? 'Indisponível' : undefined,
+  })) || [];
+
+  const alerts = zabbixAlerts || [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -49,42 +38,50 @@ const Index = () => {
         <section>
           <h2 className="text-xl font-semibold mb-6 text-foreground">Métricas em Tempo Real</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <MetricCard
-              title="CPU Usage"
-              value={78}
-              unit="%"
-              icon={Cpu}
-              trend="up"
-              trendValue="+5%"
-              status="warning"
-            />
-            <MetricCard
-              title="Memória RAM"
-              value={64}
-              unit="%"
-              icon={HardDrive}
-              trend="stable"
-              trendValue="0%"
-              status="normal"
-            />
-            <MetricCard
-              title="Latência de Rede"
-              value={12}
-              unit="ms"
-              icon={Network}
-              trend="down"
-              trendValue="-3ms"
-              status="normal"
-            />
-            <MetricCard
-              title="Uptime"
-              value={99.8}
-              unit="%"
-              icon={Activity}
-              trend="stable"
-              trendValue="99.8%"
-              status="normal"
-            />
+            {metricsLoading ? (
+              <div className="metric-card flex items-center justify-center">
+                <LoadingSpinner />
+              </div>
+            ) : metricsError ? (
+              <div className="metric-card flex items-center justify-center text-destructive">
+                Erro: {metricsError.message}
+              </div>
+            ) : (
+              <>
+                <MetricCard
+                  title="CPU Média"
+                  value={zabbixMetrics?.find(m => m.type === 'cpu')?.value || '0'}
+                  unit="%"
+                  icon={Cpu}
+                  trend="stable"
+                  status="normal"
+                />
+                <MetricCard
+                  title="Memória RAM"
+                  value={zabbixMetrics?.find(m => m.type === 'memory')?.value || '0'}
+                  unit="%"
+                  icon={HardDrive}
+                  trend="stable"
+                  status="normal"
+                />
+                <MetricCard
+                  title="Ping Médio"
+                  value={zabbixMetrics?.find(m => m.type === 'ping')?.value || '0'}
+                  unit="ms"
+                  icon={Network}
+                  trend="stable"
+                  status="normal"
+                />
+                <MetricCard
+                  title="Hosts Online"
+                  value={hosts.filter(h => h.status === 'online').length.toString()}
+                  unit={`/${hosts.length}`}
+                  icon={Activity}
+                  trend="stable"
+                  status="normal"
+                />
+              </>
+            )}
           </div>
         </section>
 
@@ -92,8 +89,28 @@ const Index = () => {
         <section>
           <h2 className="text-xl font-semibold mb-6 text-foreground">Status do Sistema</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <HostStatusCard hosts={mockHosts} />
-            <AlertsCard alerts={mockAlerts} />
+            {hostsLoading ? (
+              <div className="metric-card flex items-center justify-center min-h-[200px]">
+                <LoadingSpinner />
+              </div>
+            ) : hostsError ? (
+              <div className="metric-card flex items-center justify-center min-h-[200px] text-destructive">
+                Erro ao carregar hosts: {hostsError.message}
+              </div>
+            ) : (
+              <HostStatusCard hosts={hosts} />
+            )}
+            {alertsLoading ? (
+              <div className="metric-card flex items-center justify-center min-h-[200px]">
+                <LoadingSpinner />
+              </div>
+            ) : alertsError ? (
+              <div className="metric-card flex items-center justify-center min-h-[200px] text-destructive">
+                Erro ao carregar alertas: {alertsError.message}
+              </div>
+            ) : (
+              <AlertsCard alerts={alerts} />
+            )}
           </div>
         </section>
 

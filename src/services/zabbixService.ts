@@ -1,140 +1,185 @@
+import { supabase } from '@/integrations/supabase/client';
+
 /**
- * Zabbix API Integration Service
- * 
- * Para integrar com Zabbix, você precisará:
- * 1. Configurar as credenciais do Zabbix no Supabase (Edge Functions)
- * 2. Criar endpoints no Supabase para fazer proxy das chamadas do Zabbix
- * 3. Implementar autenticação via token Zabbix
- * 
- * Estrutura de integração recomendada:
- * - Supabase Edge Functions para comunicação segura com Zabbix API
- * - Cache de dados para melhor performance
- * - Websockets para atualizações em tempo real
+ * Interfaces para dados do Zabbix
  */
-
-// Tipos de dados do Zabbix
 export interface ZabbixHost {
-  hostid: string;
-  host: string;
+  id: string;
   name: string;
-  status: '0' | '1'; // 0 = enabled, 1 = disabled
-  available: '0' | '1' | '2'; // 0 = unknown, 1 = available, 2 = unavailable
-  interfaces: ZabbixInterface[];
-}
-
-export interface ZabbixInterface {
-  interfaceid: string;
-  hostid: string;
+  host: string;
+  status: 'enabled' | 'disabled';
+  available: 'online' | 'offline';
   ip: string;
   dns: string;
-  port: string;
-  type: string;
+  groups: string[];
 }
 
 export interface ZabbixAlert {
-  alertid: string;
-  actionid: string;
-  eventid: string;
-  userid: string;
-  clock: string;
-  mediatypeid: string;
-  sendto: string;
-  subject: string;
-  message: string;
-  status: string;
+  id: string;
+  title: string;
+  host: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  timestamp: string;
+  description: string;
+  acknowledged: boolean;
 }
 
 export interface ZabbixMetric {
-  itemid: string;
+  hostId: string;
+  hostName: string;
+  itemId: string;
   name: string;
-  key_: string;
-  hostid: string;
-  value_type: string;
+  key: string;
+  value: string;
   units: string;
-  lastvalue: string;
-  lastclock: string;
+  type: string;
 }
 
-// Serviço principal - implementar após configurar Supabase
+export interface ZabbixHistoryData {
+  timestamp: number;
+  value: number;
+}
+
+/**
+ * Serviço para integração com Zabbix via Supabase Edge Functions
+ * Todas as operações são READ-ONLY para garantir segurança
+ */
 export class ZabbixService {
-  private baseUrl: string;
-  private token: string | null = null;
-
-  constructor() {
-    // Configurar via variáveis de ambiente do Supabase
-    this.baseUrl = '/api/zabbix'; // Endpoint do Supabase Edge Function
-  }
-
   /**
-   * Autentica com o Zabbix via Supabase Edge Function
-   * Edge Function fará a chamada real para o Zabbix API
+   * Busca lista de hosts do Zabbix
+   * @returns Promise<ZabbixHost[]> Lista de hosts
    */
-  async authenticate(username: string, password: string): Promise<boolean> {
+  async getHosts(): Promise<ZabbixHost[]> {
     try {
-      // Implementar chamada para Supabase Edge Function
-      // que fará a autenticação com Zabbix
-      console.log('Implementar autenticação Zabbix via Supabase');
-      return false;
-    } catch (error) {
-      console.error('Erro na autenticação:', error);
-      return false;
-    }
-  }
+      const url = new URL(`${window.location.origin}/functions/v1/zabbix-proxy`);
+      url.searchParams.append('action', 'get-hosts');
+      
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-  /**
-   * Busca hosts do Zabbix
-   * Mapeia dados do Zabbix para formato do dashboard
-   */
-  async getHosts(): Promise<any[]> {
-    try {
-      // Implementar via Supabase Edge Function
-      console.log('Implementar busca de hosts via Supabase');
-      return [];
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Unknown error from Zabbix proxy');
+      }
+
+      return result.data;
     } catch (error) {
       console.error('Erro ao buscar hosts:', error);
-      return [];
+      throw error;
     }
   }
 
   /**
    * Busca alertas ativos do Zabbix
+   * @returns Promise<ZabbixAlert[]> Lista de alertas
    */
-  async getAlerts(): Promise<any[]> {
+  async getAlerts(): Promise<ZabbixAlert[]> {
     try {
-      // Implementar via Supabase Edge Function
-      console.log('Implementar busca de alertas via Supabase');
-      return [];
+      const url = new URL(`${window.location.origin}/functions/v1/zabbix-proxy`);
+      url.searchParams.append('action', 'get-alerts');
+      
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Unknown error from Zabbix proxy');
+      }
+
+      return result.data;
     } catch (error) {
       console.error('Erro ao buscar alertas:', error);
-      return [];
+      throw error;
     }
   }
 
   /**
-   * Busca métricas específicas
+   * Busca métricas específicas do Zabbix
+   * @param hostIds IDs dos hosts (opcional)
+   * @returns Promise<ZabbixMetric[]> Lista de métricas
    */
-  async getMetrics(hostIds: string[], itemKeys: string[]): Promise<any[]> {
+  async getMetrics(hostIds?: string[]): Promise<ZabbixMetric[]> {
     try {
-      // Implementar via Supabase Edge Function
-      console.log('Implementar busca de métricas via Supabase');
-      return [];
+      const url = new URL(`${window.location.origin}/functions/v1/zabbix-proxy`);
+      url.searchParams.append('action', 'get-metrics');
+      
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ hostIds }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Unknown error from Zabbix proxy');
+      }
+
+      return result.data;
     } catch (error) {
       console.error('Erro ao buscar métricas:', error);
-      return [];
+      throw error;
     }
   }
 
   /**
    * Busca dados históricos para gráficos
+   * @param itemId ID do item
+   * @param timeFrom Timestamp inicial
+   * @param timeTill Timestamp final
+   * @returns Promise<ZabbixHistoryData[]> Dados históricos
    */
-  async getHistoryData(itemId: string, timeFrom: number, timeTill: number): Promise<any[]> {
+  async getHistoryData(itemId: string, timeFrom: number, timeTill: number): Promise<ZabbixHistoryData[]> {
     try {
-      // Implementar via Supabase Edge Function
-      console.log('Implementar busca de histórico via Supabase');
-      return [];
+      const url = new URL(`${window.location.origin}/functions/v1/zabbix-proxy`);
+      url.searchParams.append('action', 'get-history');
+      
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ itemId, timeFrom, timeTill }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Unknown error from Zabbix proxy');
+      }
+
+      return result.data;
     } catch (error) {
-      console.error('Erro ao buscar histórico:', error);
-      return [];
+      console.error('Erro ao buscar dados históricos:', error);
+      throw error;
     }
   }
 }
