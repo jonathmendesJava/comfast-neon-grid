@@ -284,6 +284,99 @@ class ZabbixAPI {
     return 'other'
   }
 
+  async getHostDetails(hostId: string): Promise<any> {
+    console.log(`Fetching details for host: ${hostId}`)
+    
+    // Get host basic information
+    const hostResponse = await this.makeRequest('host.get', {
+      output: ['hostid', 'name', 'host', 'status', 'available'],
+      selectInterfaces: ['interfaceid', 'main', 'type', 'useip', 'ip', 'dns', 'port'],
+      selectGroups: ['name'],
+      selectParentTemplates: ['name'],
+      hostids: [hostId]
+    })
+
+    if (!hostResponse || hostResponse.length === 0) {
+      throw new Error(`Host with ID ${hostId} not found`)
+    }
+
+    const host = hostResponse[0]
+
+    // Get host metrics/items
+    const itemsResponse = await this.makeRequest('item.get', {
+      output: ['itemid', 'name', 'key_', 'lastvalue', 'units', 'lastclock', 'status'],
+      hostids: [hostId],
+      monitored: true,
+      filter: {
+        status: 0 // Only active items
+      },
+      limit: 100,
+      sortfield: 'name'
+    })
+
+    // Get active alerts for this host
+    const alertsResponse = await this.makeRequest('trigger.get', {
+      output: ['triggerid', 'description', 'priority', 'status', 'lastchange'],
+      hostids: [hostId],
+      only_true: true, // Only problems
+      monitored: true,
+      active: true,
+      expandDescription: true,
+      sortfield: 'priority',
+      sortorder: 'DESC'
+    })
+
+    // Process current metrics
+    const currentMetrics = itemsResponse
+      .filter((item: any) => item.lastvalue !== null && item.lastvalue !== undefined)
+      .map((item: any) => {
+        const rawValue = parseFloat(item.lastvalue || '0')
+        const normalizedValue = this.normalizeMetricValue(rawValue, item.key_, item.units)
+        
+        return {
+          itemId: item.itemid,
+          name: item.name,
+          key: item.key_,
+          value: normalizedValue.value.toString(),
+          units: normalizedValue.unit,
+          type: this.getMetricType(item.key_),
+          lastUpdate: item.lastclock ? new Date(parseInt(item.lastclock) * 1000).toISOString() : new Date().toISOString(),
+          status: item.status === '0' ? 'active' : 'disabled'
+        }
+      })
+
+    // Process active alerts
+    const activeAlerts = alertsResponse.map((trigger: any) => ({
+      id: trigger.triggerid,
+      description: trigger.description,
+      severity: this.mapPriority(trigger.priority),
+      status: trigger.status === '0' ? 'enabled' : 'disabled',
+      lastChange: new Date(parseInt(trigger.lastchange) * 1000).toISOString()
+    }))
+
+    // Calculate uptime (if available from system.uptime item)
+    const uptimeItem = itemsResponse.find((item: any) => 
+      item.key_.includes('system.uptime') || item.key_.includes('uptime')
+    )
+    const uptime = uptimeItem ? parseInt(uptimeItem.lastvalue || '0') : 0
+
+    return {
+      id: host.hostid,
+      name: host.name || host.host,
+      host: host.host,
+      status: host.status === '0' ? 'enabled' : 'disabled',
+      available: host.available === '0' ? 'online' : 'offline',
+      ip: host.interfaces?.[0]?.ip || 'N/A',
+      dns: host.interfaces?.[0]?.dns || 'N/A',
+      uptime: uptime,
+      lastCheck: new Date().toISOString(),
+      groups: host.groups?.map((g: any) => g.name) || [],
+      templates: host.parentTemplates?.map((t: any) => t.name) || [],
+      currentMetrics: currentMetrics,
+      activeAlerts: activeAlerts
+    }
+  }
+
   private normalizeMetricValue(value: number, key: string, units: string): { value: number; unit: string } {
     const lowerKey = key.toLowerCase()
     
@@ -421,6 +514,16 @@ serve(async (req) => {
           )
         }
         result = await zabbix.getHistory(requestData.itemId, requestData.timeFrom, requestData.timeTill)
+        break
+        
+      case 'get-host-details':
+        if (!requestData.hostId) {
+          return new Response(
+            JSON.stringify({ error: 'Missing required parameter: hostId' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        result = await zabbix.getHostDetails(requestData.hostId)
         break
         
       default:

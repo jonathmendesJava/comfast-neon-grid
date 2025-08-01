@@ -11,9 +11,10 @@ interface Host {
 
 interface HostStatusCardProps {
   hosts: Host[];
+  onHostClick?: (host: Host) => void;
 }
 
-export const HostStatusCard = ({ hosts }: HostStatusCardProps) => {
+export const HostStatusCard = ({ hosts, onHostClick }: HostStatusCardProps) => {
   const onlineHosts = hosts.filter(host => host.status === "online");
   const offlineHosts = hosts.filter(host => host.status === "offline");
 
@@ -43,7 +44,10 @@ export const HostStatusCard = ({ hosts }: HostStatusCardProps) => {
         {hosts.map((host) => (
           <div
             key={host.id}
-            className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-muted/5 hover:bg-muted/10 transition-colors"
+            className={`flex items-center justify-between p-4 rounded-lg border border-border/50 bg-muted/5 hover:bg-muted/10 transition-colors ${
+              onHostClick ? 'cursor-pointer hover:border-primary/30' : ''
+            }`}
+            onClick={() => onHostClick?.(host)}
           >
             <div className="flex items-center space-x-4">
               <div className={`p-2 rounded-lg ${

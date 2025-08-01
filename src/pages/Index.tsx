@@ -1,8 +1,10 @@
+import React from "react";
 import { Cpu, HardDrive, Network, Activity, Clock, Server } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { EnhancedMetricCard } from "@/components/dashboard/EnhancedMetricCard";
 import { HostStatusCard } from "@/components/dashboard/HostStatusCard";
+import { HostDetailsModal } from "@/components/dashboard/HostDetailsModal";
 import { AlertsCard } from "@/components/dashboard/AlertsCard";
 import { MetricsOverview } from "@/components/dashboard/MetricsOverview";
 import { ChartPlaceholder } from "@/components/dashboard/ChartPlaceholder";
@@ -12,6 +14,9 @@ import { useZabbixHosts, useZabbixAlerts, useZabbixMetrics } from "@/hooks/useZa
 import { LoadingSpinner } from "@/components/dashboard/LoadingSpinner";
 
 const Index = () => {
+  const [selectedHost, setSelectedHost] = React.useState<any>(null);
+  const [isHostModalOpen, setIsHostModalOpen] = React.useState(false);
+  
   // Hooks para dados reais do Zabbix
   const { data: zabbixHosts, isLoading: hostsLoading, error: hostsError } = useZabbixHosts();
   const { data: zabbixAlerts, isLoading: alertsLoading, error: alertsError } = useZabbixAlerts();
@@ -28,6 +33,16 @@ const Index = () => {
   })) || [];
 
   const alerts = zabbixAlerts || [];
+
+  const handleHostClick = (host: any) => {
+    setSelectedHost(host);
+    setIsHostModalOpen(true);
+  };
+
+  const handleCloseHostModal = () => {
+    setIsHostModalOpen(false);
+    setSelectedHost(null);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -55,7 +70,7 @@ const Index = () => {
                 Erro ao carregar hosts: {hostsError.message}
               </div>
             ) : (
-              <HostStatusCard hosts={hosts} />
+              <HostStatusCard hosts={hosts} onHostClick={handleHostClick} />
             )}
             {alertsLoading ? (
               <div className="metric-card flex items-center justify-center min-h-[200px]">
@@ -194,6 +209,12 @@ const Index = () => {
       
       {/* Footer */}
       <Footer />
+      
+      <HostDetailsModal 
+        host={selectedHost}
+        isOpen={isHostModalOpen}
+        onClose={handleCloseHostModal}
+      />
     </div>
   );
 };
