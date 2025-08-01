@@ -102,52 +102,6 @@ export const MetricsOverview: React.FC = () => {
           subtitle={alerts && alerts.length > 0 ? `${alerts.filter(a => a.severity === 'critical').length} críticos` : 'Sistema estável'}
         />
       </div>
-
-
-      {/* Métricas Detalhadas por Host */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Métricas Detalhadas por Host</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {Object.entries(metricGroups).map(([type, typeMetrics]: [string, any]) => (
-              <div key={type} className="space-y-2">
-                <h4 className="font-semibold capitalize">{type}</h4>
-                {typeMetrics.slice(0, 5).map((metric: any) => (
-                  <EnhancedMetricCard
-                    key={metric.itemId}
-                    title={metric.name}
-                    value={parseFloat(metric.value || '0').toFixed(1)}
-                    unit={metric.units}
-                    icon={
-                      type === 'cpu' ? Cpu :
-                      type === 'memory' ? MemoryStick :
-                      type === 'disk' ? HardDrive :
-                      type === 'network' ? Network :
-                      Activity
-                    }
-                    lastUpdate={metric.lastUpdate}
-                    hostInfo={{
-                      name: metric.hostName,
-                      status: metric.hostAvailable === 'online' ? 'online' : 
-                             metric.hostAvailable === 'offline' ? 'offline' : 'unknown',
-                      ip: metric.hostIp
-                    }}
-                    status={
-                      type === 'cpu' && parseFloat(metric.value || '0') > 80 ? 'critical' :
-                      type === 'memory' && parseFloat(metric.value || '0') > 85 ? 'critical' :
-                      type === 'cpu' && parseFloat(metric.value || '0') > 60 ? 'warning' :
-                      type === 'memory' && parseFloat(metric.value || '0') > 70 ? 'warning' :
-                      'normal'
-                    }
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

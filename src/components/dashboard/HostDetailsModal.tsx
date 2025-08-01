@@ -4,7 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from './LoadingSpinner';
+import { EnhancedMetricCard } from './EnhancedMetricCard';
 import { zabbixService } from '@/services/zabbixService';
+import { useZabbixMetrics } from '@/hooks/useZabbixData';
 import { Server, Activity, AlertTriangle, CheckCircle, Clock, Globe, Shield, Wifi, WifiOff, Cpu, MemoryStick, HardDrive, Network } from 'lucide-react';
 
 interface Host {
@@ -88,6 +90,24 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
     retry: 3,
     retryDelay: 1000,
   });
+
+  // Buscar métricas específicas do host
+  const { data: hostMetrics, isLoading: metricsLoading } = useZabbixMetrics([host?.id]);
+
+  // Agrupar métricas por tipo para este host específico
+  const groupHostMetricsByType = () => {
+    if (!hostMetrics) return {};
+    
+    return hostMetrics
+      .filter(metric => metric.hostId === host?.id)
+      .reduce((acc: any, metric: any) => {
+        if (!acc[metric.type]) acc[metric.type] = [];
+        acc[metric.type].push(metric);
+        return acc;
+      }, {});
+  };
+
+  const hostMetricGroups = groupHostMetricsByType();
 
   const formatUptime = (seconds: number) => {
     const days = Math.floor(seconds / 86400);
@@ -187,8 +207,9 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
             </div>
           ) : hostDetails ? (
             <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+                <TabsTrigger value="metrics">Métricas Detalhadas</TabsTrigger>
                 <TabsTrigger value="items">Items ({hostDetails.items?.length || 0})</TabsTrigger>
                 <TabsTrigger value="alerts">Alertas ({hostDetails.alerts?.length || 0})</TabsTrigger>
                 <TabsTrigger value="graphs">Gráficos</TabsTrigger>
@@ -398,6 +419,84 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                       {hostDetails.groups.map((group, index) => (
                         <Badge key={index} variant="outline">{group}</Badge>
                       ))}
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="metrics" className="space-y-6">
+                <div className="dashboard-card">
+                  <h4 className="font-semibold mb-4 flex items-center gap-2 text-lg">
+                    <Activity className="w-5 h-5 text-primary" />
+                    Métricas Detalhadas do Host
+                  </h4>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Visualização detalhada das métricas coletadas especificamente para este host.
+                  </p>
+                </div>
+
+                {metricsLoading ? (
+                  <div className="flex items-center justify-center h-32">
+                    <LoadingSpinner />
+                  </div>
+                ) : hostMetrics && Object.keys(hostMetricGroups).length > 0 ? (
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {Object.entries(hostMetricGroups).map(([type, typeMetrics]: [string, any]) => (
+                      <div key={type} className="dashboard-card">
+                        <h5 className="font-semibold capitalize mb-4 flex items-center gap-2">
+                          {getMetricIcon(type)}
+                          {type === 'cpu' ? 'CPU & Processamento' :
+                           type === 'memory' ? 'Memória' :
+                           type === 'disk' ? 'Armazenamento' :
+                           type === 'network' ? 'Rede' :
+                           type === 'system' ? 'Sistema' : type}
+                          <Badge variant="outline" className="text-xs">
+                            {typeMetrics.length} métricas
+                          </Badge>
+                        </h5>
+                        <div className="space-y-3">
+                          {typeMetrics.slice(0, 6).map((metric: any) => (
+                            <EnhancedMetricCard
+                              key={metric.itemId}
+                              title={metric.name}
+                              value={parseFloat(metric.value || '0').toFixed(1)}
+                              unit={metric.units}
+                              icon={
+                                type === 'cpu' ? Cpu :
+                                type === 'memory' ? MemoryStick :
+                                type === 'disk' ? HardDrive :
+                                type === 'network' ? Network :
+                                Activity
+                              }
+                              lastUpdate={metric.lastUpdate}
+                              status={
+                                type === 'cpu' && parseFloat(metric.value || '0') > 80 ? 'critical' :
+                                type === 'memory' && parseFloat(metric.value || '0') > 85 ? 'critical' :
+                                type === 'cpu' && parseFloat(metric.value || '0') > 60 ? 'warning' :
+                                type === 'memory' && parseFloat(metric.value || '0') > 70 ? 'warning' :
+                                'normal'
+                              }
+                              trend="stable"
+                              subtitle={`${metric.hostName} - ${metric.hostIp}`}
+                            />
+                          ))}
+                          {typeMetrics.length > 6 && (
+                            <div className="text-center py-2">
+                              <Badge variant="outline" className="text-xs">
+                                +{typeMetrics.length - 6} métricas adicionais
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="dashboard-card">
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <h5 className="font-medium mb-2">Nenhuma métrica encontrada</h5>
+                      <p className="text-sm">Este host não possui métricas específicas configuradas ou disponíveis no momento.</p>
                     </div>
                   </div>
                 )}
