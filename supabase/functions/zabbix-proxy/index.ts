@@ -192,8 +192,7 @@ class ZabbixAPI {
         }) :
         await this.makeRequest('host.get', {
           output: ['hostid', 'name', 'host', 'status', 'available'],
-          selectInterfaces: ['ip'],
-          limit: 10
+          selectInterfaces: ['ip']
         })
 
       const metrics = []
@@ -339,12 +338,10 @@ class ZabbixAPI {
     // Get ALL items for this host (like Zabbix Recent data)
     console.log(`Getting items for host: ${hostId}`)
     const itemsResponse = await this.makeRequest('item.get', {
-      output: ['itemid', 'name', 'key_', 'lastvalue', 'units', 'lastclock', 'status', 'applications'],
-      selectApplications: ['name'],
+      output: ['itemid', 'name', 'key_', 'lastvalue', 'lastclock'],
       hostids: [hostId],
       monitored: true,
       webitems: false,
-      limit: 100,
       sortfield: 'name'
     })
 

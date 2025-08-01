@@ -1,5 +1,5 @@
 import React from 'react';
-import { useZabbixMetrics } from '@/hooks/useZabbixData';
+import { useZabbixMetrics, useZabbixAlerts } from '@/hooks/useZabbixData';
 import { EnhancedMetricCard } from './EnhancedMetricCard';
 import { RealTimeChart } from './RealTimeChart';
 import { Cpu, MemoryStick, HardDrive, Network, Activity, Clock, Users, AlertTriangle } from 'lucide-react';
@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export const MetricsOverview: React.FC = () => {
   const { data: metrics, isLoading, error } = useZabbixMetrics();
+  const { data: alerts, isLoading: alertsLoading } = useZabbixAlerts();
 
   // Agrupar métricas por tipo
   const groupMetricsByType = () => {
@@ -82,7 +83,7 @@ export const MetricsOverview: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Estatísticas Gerais */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2">
         <EnhancedMetricCard
           title="Total de Hosts"
           value={stats.totalHosts.toString()}
@@ -93,31 +94,12 @@ export const MetricsOverview: React.FC = () => {
         />
         
         <EnhancedMetricCard
-          title="CPU Média"
-          value={stats.avgCpu.toString()}
-          unit="%"
-          icon={Cpu}
-          isLoading={isLoading}
-          status={stats.avgCpu > 80 ? 'critical' : stats.avgCpu > 60 ? 'warning' : 'normal'}
-          trend={stats.avgCpu > 70 ? 'up' : stats.avgCpu < 30 ? 'down' : 'stable'}
-        />
-        
-        <EnhancedMetricCard
-          title="Memória Média"
-          value={stats.avgMemory.toString()}
-          unit="%"
-          icon={MemoryStick}
-          isLoading={isLoading}
-          status={stats.avgMemory > 85 ? 'critical' : stats.avgMemory > 70 ? 'warning' : 'normal'}
-          trend={stats.avgMemory > 75 ? 'up' : stats.avgMemory < 50 ? 'down' : 'stable'}
-        />
-        
-        <EnhancedMetricCard
           title="Alertas Ativos"
-          value="0" // TODO: Implementar contagem de alertas
+          value={(alerts?.length || 0).toString()}
           icon={AlertTriangle}
-          isLoading={isLoading}
-          status="normal"
+          isLoading={alertsLoading}
+          status={alerts && alerts.length > 0 ? 'warning' : 'normal'}
+          subtitle={alerts && alerts.length > 0 ? `${alerts.filter(a => a.severity === 'critical').length} críticos` : 'Sistema estável'}
         />
       </div>
 
