@@ -110,7 +110,8 @@ class ZabbixAPI {
         name: host.name || host.host,
         host: host.host,
         status: host.status === '0' ? 'enabled' : 'disabled',
-        available: host.available === '1' ? 'online' : 'offline',
+        // Fix: Zabbix available field - '0' = online, '1' = offline, '2' = unknown
+        available: host.available === '0' ? 'online' : 'offline',
         ip: host.interfaces?.[0]?.ip || 'N/A',
         dns: host.interfaces?.[0]?.dns || 'N/A',
         groups: host.groups?.map((g: any) => g.name) || []
@@ -203,18 +204,22 @@ class ZabbixAPI {
         })
 
         for (const item of relevantItems) {
+          const rawValue = parseFloat(item.lastvalue || '0')
+          const normalizedValue = this.normalizeMetricValue(rawValue, item.key_, item.units)
+          
           metrics.push({
             hostId: host.hostid,
             hostName: host.name,
             hostHost: host.host,
             hostStatus: host.status === '0' ? 'enabled' : 'disabled',
-            hostAvailable: host.available === '1' ? 'online' : 'offline',
+            // Fix: Zabbix available field - '0' = online, '1' = offline, '2' = unknown
+            hostAvailable: host.available === '0' ? 'online' : 'offline',
             hostIp: host.interfaces?.[0]?.ip || 'N/A',
             itemId: item.itemid,
             name: item.name,
             key: item.key_,
-            value: item.lastvalue || '0',
-            units: item.units || '',
+            value: normalizedValue.value.toString(),
+            units: normalizedValue.unit,
             type: this.getMetricType(item.key_),
             lastUpdate: item.lastclock ? new Date(parseInt(item.lastclock) * 1000).toISOString() : new Date().toISOString()
           })
@@ -277,6 +282,64 @@ class ZabbixAPI {
     if (lowerKey.includes('proc.num')) return 'processes'
     if (lowerKey.includes('swap')) return 'swap'
     return 'other'
+  }
+
+  private normalizeMetricValue(value: number, key: string, units: string): { value: number; unit: string } {
+    const lowerKey = key.toLowerCase()
+    
+    // CPU metrics - convert to percentage
+    if (lowerKey.includes('cpu') && lowerKey.includes('util')) {
+      return { value: Math.min(100, Math.max(0, value)), unit: '%' }
+    }
+    
+    // Memory metrics
+    if (lowerKey.includes('memory') || lowerKey.includes('vm.memory')) {
+      if (units === 'B' && value > 1000000) {
+        // Convert bytes to MB
+        return { value: Math.round(value / 1024 / 1024 * 100) / 100, unit: 'MB' }
+      }
+      if (lowerKey.includes('pused') || lowerKey.includes('util')) {
+        // Already in percentage
+        return { value: Math.min(100, Math.max(0, value)), unit: '%' }
+      }
+    }
+    
+    // Network metrics - convert bytes to more readable units
+    if (lowerKey.includes('net.if')) {
+      if (units === 'bps' || units === 'B') {
+        if (value > 1000000) {
+          return { value: Math.round(value / 1000000 * 100) / 100, unit: 'Mbps' }
+        } else if (value > 1000) {
+          return { value: Math.round(value / 1000 * 100) / 100, unit: 'Kbps' }
+        }
+      }
+    }
+    
+    // Disk metrics
+    if (lowerKey.includes('vfs.fs')) {
+      if (units === 'B' && value > 1000000000) {
+        // Convert bytes to GB
+        return { value: Math.round(value / 1024 / 1024 / 1024 * 100) / 100, unit: 'GB' }
+      }
+      if (lowerKey.includes('pused')) {
+        // Already in percentage
+        return { value: Math.min(100, Math.max(0, value)), unit: '%' }
+      }
+    }
+    
+    // Uptime - convert seconds to hours/days
+    if (lowerKey.includes('uptime') && units === 's') {
+      const hours = Math.floor(value / 3600)
+      if (hours > 24) {
+        const days = Math.floor(hours / 24)
+        return { value: days, unit: 'days' }
+      }
+      return { value: hours, unit: 'hours' }
+    }
+    
+    // Default: return as-is with original or simplified unit
+    const cleanUnit = units || ''
+    return { value: Math.round(value * 100) / 100, unit: cleanUnit }
   }
 }
 
