@@ -1,5 +1,7 @@
 import React from "react";
-import { Cpu, HardDrive, Network, Activity, Clock, Server, MemoryStick } from "lucide-react";
+import { Cpu, HardDrive, Network, Activity, Clock, Server, MemoryStick, BarChart3 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { EnhancedMetricCard } from "@/components/dashboard/EnhancedMetricCard";
@@ -15,6 +17,7 @@ import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 import { LoadingSpinner } from "@/components/dashboard/LoadingSpinner";
 
 const Index = () => {
+  const navigate = useNavigate();
   const [selectedHost, setSelectedHost] = React.useState<any>(null);
   const [isHostModalOpen, setIsHostModalOpen] = React.useState(false);
   

@@ -45,6 +45,21 @@ export interface ZabbixHistoryData {
   value: number;
 }
 
+export interface CriticalMetrics {
+  ping: ZabbixHistoryData[];
+  latency: ZabbixHistoryData[];
+  cpu: ZabbixHistoryData[];
+  memory: ZabbixHistoryData[];
+  timestamps: number[];
+}
+
+export interface CriticalHistoryResponse {
+  hostId: string;
+  timeRange: string;
+  metrics: CriticalMetrics;
+  generatedAt: string;
+}
+
 /**
  * Serviço para integração com Zabbix via Supabase Edge Functions
  * Todas as operações são READ-ONLY para garantir segurança
@@ -158,6 +173,37 @@ export class ZabbixService {
       return result.data;
     } catch (error) {
       console.error('Erro ao buscar dados históricos:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Busca histórico de métricas críticas para análise de instabilidade
+   * @param hostId ID do host
+   * @param timeRange Período de tempo ('1h', '6h', '24h')
+   * @returns Promise<CriticalHistoryResponse> Histórico de métricas críticas
+   */
+  async getCriticalHistory(hostId: string, timeRange: string = '1h'): Promise<CriticalHistoryResponse> {
+    try {
+      const { data: result, error } = await supabase.functions.invoke('zabbix-proxy', {
+        body: { 
+          action: 'get-critical-history',
+          hostId,
+          timeRange
+        }
+      });
+
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`);
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Unknown error from Zabbix proxy');
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Erro ao buscar histórico crítico:', error);
       throw error;
     }
   }

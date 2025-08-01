@@ -29,6 +29,7 @@ class ZabbixAPI {
   private baseUrl: string
   private token: string
   private authToken: string | null = null
+  private requestId: number = 1
 
   constructor(baseUrl: string, token: string) {
     this.baseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
@@ -431,6 +432,158 @@ class ZabbixAPI {
     }
   }
 
+  /**
+   * Gets critical metrics history for instability prediction
+   */
+  async getCriticalHistory(hostId: string, timeRange: string = '1h'): Promise<any> {
+    console.log(`Getting critical history for host: ${hostId}, timeRange: ${timeRange}`)
+    
+    try {
+      await this.authenticate()
+      
+      // Get time range in seconds
+      const now = Math.floor(Date.now() / 1000)
+      let timeFrom: number
+      
+      switch (timeRange) {
+        case '1h':
+          timeFrom = now - 3600
+          break
+        case '6h':
+          timeFrom = now - 21600
+          break
+        case '24h':
+          timeFrom = now - 86400
+          break
+        default:
+          timeFrom = now - 3600
+      }
+
+      // Get critical items: ping, latency, CPU, memory
+      const itemsRequest: ZabbixRequest = {
+        jsonrpc: '2.0',
+        method: 'item.get',
+        params: {
+          hostids: hostId,
+          output: ['itemid', 'name', 'key_', 'units'],
+          search: {
+            key_: 'icmpping'
+          },
+          searchWildcardsEnabled: true,
+          limit: 50
+        },
+        auth: this.authToken,
+        id: this.requestId++
+      }
+
+      console.log('Making Zabbix request: item.get for critical items')
+      
+      const itemsResponse = await fetch(`${this.baseUrl}api_jsonrpc.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json-rpc' },
+        body: JSON.stringify(itemsRequest)
+      })
+
+      if (!itemsResponse.ok) {
+        throw new Error(`HTTP error! status: ${itemsResponse.status}`)
+      }
+
+      const itemsData: ZabbixResponse = await itemsResponse.json()
+      
+      if (itemsData.error) {
+        throw new Error(`Zabbix API error: ${itemsData.error.message}`)
+      }
+
+      const items = itemsData.result || []
+      console.log(`Found ${items.length} critical items`)
+
+      const criticalMetrics: any = {
+        ping: [],
+        latency: [],
+        cpu: [],
+        memory: [],
+        timestamps: []
+      }
+
+      // Get history for each critical item
+      for (const item of items) {
+        let historyType = 0 // default to float
+        
+        if (item.key_.includes('icmpping')) {
+          historyType = 3 // integer for ping status
+        }
+
+        const historyRequest: ZabbixRequest = {
+          jsonrpc: '2.0',
+          method: 'history.get',
+          params: {
+            output: 'extend',
+            history: historyType,
+            itemids: item.itemid,
+            time_from: timeFrom,
+            time_till: now,
+            sortfield: 'clock',
+            sortorder: 'ASC',
+            limit: 288 // ~24h worth of 5min intervals
+          },
+          auth: this.authToken,
+          id: this.requestId++
+        }
+
+        console.log(`Getting history for item: ${item.name}`)
+        
+        const historyResponse = await fetch(`${this.baseUrl}api_jsonrpc.php`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json-rpc' },
+          body: JSON.stringify(historyRequest)
+        })
+
+        if (historyResponse.ok) {
+          const historyData: ZabbixResponse = await historyResponse.json()
+          
+          if (!historyData.error && historyData.result) {
+            const history = historyData.result.map((h: any) => ({
+              timestamp: parseInt(h.clock) * 1000,
+              value: parseFloat(h.value) || 0
+            }))
+
+            // Categorize metrics by type
+            if (item.key_.includes('icmpping') && !item.key_.includes('sec')) {
+              criticalMetrics.ping = history
+            } else if (item.key_.includes('icmppingsec')) {
+              criticalMetrics.latency = history
+            } else if (item.key_.includes('cpu')) {
+              criticalMetrics.cpu = history
+            } else if (item.key_.includes('memory')) {
+              criticalMetrics.memory = history
+            }
+          }
+        }
+      }
+
+      // Generate timestamp array from the longest history
+      const allTimestamps = [
+        ...criticalMetrics.ping.map((h: any) => h.timestamp),
+        ...criticalMetrics.latency.map((h: any) => h.timestamp),
+        ...criticalMetrics.cpu.map((h: any) => h.timestamp),
+        ...criticalMetrics.memory.map((h: any) => h.timestamp)
+      ]
+      
+      criticalMetrics.timestamps = [...new Set(allTimestamps)].sort((a, b) => a - b)
+
+      return {
+        hostId,
+        timeRange,
+        metrics: criticalMetrics,
+        generatedAt: new Date().toISOString()
+      }
+
+    } catch (error) {
+      console.error('Error getting critical history:', error)
+      throw error
+    }
+  }
+
   private normalizeMetricValue(value: number, key: string, units: string): { value: number; unit: string } {
     const lowerKey = key.toLowerCase()
     
@@ -578,6 +731,16 @@ serve(async (req) => {
           )
         }
         result = await zabbix.getHostDetails(requestData.hostId)
+        break
+
+      case 'get-critical-history':
+        if (!requestData.hostId) {
+          return new Response(
+            JSON.stringify({ error: 'Missing required parameter: hostId' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        result = await zabbix.getCriticalHistory(requestData.hostId, requestData.timeRange || '1h')
         break
         
       default:

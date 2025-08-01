@@ -1,6 +1,10 @@
-import { Activity, Shield, Zap } from "lucide-react";
+import { Activity, Shield, Zap, BarChart3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 export const DashboardHeader = () => {
+  const navigate = useNavigate();
+  
   return (
     <header className="w-full border-b border-border/50 bg-card/30 backdrop-blur-sm">
       <div className="container mx-auto px-6 py-4">
@@ -21,6 +25,16 @@ export const DashboardHeader = () => {
           </div>
           
           <div className="flex items-center space-x-6">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={() => navigate('/prediction')}
+            >
+              <BarChart3 className="w-4 h-4" />
+              Previsão de Instabilidade
+            </Button>
+            
             <div className="flex items-center space-x-2 text-sm">
               <Activity className="w-4 h-4 text-primary" />
               <span className="text-muted-foreground">Sistema Online</span>
