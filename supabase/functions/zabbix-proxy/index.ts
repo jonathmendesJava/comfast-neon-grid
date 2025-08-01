@@ -287,6 +287,14 @@ class ZabbixAPI {
   async getHostDetails(hostId: string): Promise<any> {
     console.log(`Fetching details for host: ${hostId}`)
     
+    // Validate hostId
+    if (!hostId || hostId === 'undefined' || hostId === 'null') {
+      console.error(`Invalid hostId: ${hostId}`)
+      throw new Error(`Invalid hostId: ${hostId}`)
+    }
+
+    console.log(`Making host.get request for hostId: ${hostId}`)
+    
     // Get host basic information
     const hostResponse = await this.makeRequest('host.get', {
       output: ['hostid', 'name', 'host', 'status', 'available'],
@@ -296,29 +304,34 @@ class ZabbixAPI {
       hostids: [hostId]
     })
 
+    console.log(`Host response:`, JSON.stringify(hostResponse, null, 2))
+
     if (!hostResponse || hostResponse.length === 0) {
+      console.error(`Host not found for ID: ${hostId}`)
       throw new Error(`Host with ID ${hostId} not found`)
     }
 
     const host = hostResponse[0]
+    console.log(`Found host: ${host.name}`)
 
-    // Get host metrics/items
+    // Get ALL items for this host (like Zabbix Recent data)
+    console.log(`Getting items for host: ${hostId}`)
     const itemsResponse = await this.makeRequest('item.get', {
-      output: ['itemid', 'name', 'key_', 'lastvalue', 'units', 'lastclock', 'status'],
+      output: ['itemid', 'name', 'key_', 'lastvalue', 'units', 'lastclock', 'status', 'applications'],
+      selectApplications: ['name'],
       hostids: [hostId],
       monitored: true,
-      filter: {
-        status: 0 // Only active items
-      },
+      webitems: false,
       limit: 100,
       sortfield: 'name'
     })
 
+    console.log(`Items response count: ${itemsResponse?.length || 0}`)
+
     // Get active alerts for this host
     const alertsResponse = await this.makeRequest('trigger.get', {
-      output: ['triggerid', 'description', 'priority', 'status', 'lastchange'],
+      output: ['triggerid', 'description', 'priority', 'status', 'lastchange', 'value'],
       hostids: [hostId],
-      only_true: true, // Only problems
       monitored: true,
       active: true,
       expandDescription: true,
@@ -326,39 +339,73 @@ class ZabbixAPI {
       sortorder: 'DESC'
     })
 
-    // Process current metrics
-    const currentMetrics = itemsResponse
-      .filter((item: any) => item.lastvalue !== null && item.lastvalue !== undefined)
-      .map((item: any) => {
-        const rawValue = parseFloat(item.lastvalue || '0')
-        const normalizedValue = this.normalizeMetricValue(rawValue, item.key_, item.units)
-        
-        return {
-          itemId: item.itemid,
-          name: item.name,
-          key: item.key_,
-          value: normalizedValue.value.toString(),
-          units: normalizedValue.unit,
-          type: this.getMetricType(item.key_),
-          lastUpdate: item.lastclock ? new Date(parseInt(item.lastclock) * 1000).toISOString() : new Date().toISOString(),
-          status: item.status === '0' ? 'active' : 'disabled'
+    // Format items like Zabbix Recent data
+    const items = (itemsResponse || []).map((item: any) => {
+      const lastValue = item.lastvalue || 'No data'
+      const units = item.units || ''
+      const lastClock = item.lastclock ? new Date(parseInt(item.lastclock) * 1000) : null
+      
+      // Format value with units (like Zabbix)
+      let formattedValue = lastValue
+      if (lastValue !== 'No data' && units) {
+        if (units === 'bps' && !isNaN(lastValue)) {
+          const bps = parseFloat(lastValue)
+          formattedValue = `${bps.toFixed(4)} bps`
+        } else if (units === 'pps' && !isNaN(lastValue)) {
+          const pps = parseFloat(lastValue)
+          formattedValue = `${pps.toFixed(4)} pps`
+        } else if (item.key_.includes('ifAdminStatus') || item.key_.includes('ifOperStatus')) {
+          // Status items (1=up, 2=down, etc.)
+          const statusMap: { [key: string]: string } = {
+            '1': 'up (1)',
+            '2': 'down (2)',
+            '3': 'testing (3)'
+          }
+          formattedValue = statusMap[lastValue] || `unknown (${lastValue})`
+        } else {
+          formattedValue = `${lastValue}${units ? ' ' + units : ''}`
         }
-      })
+      }
 
-    // Process active alerts
-    const activeAlerts = alertsResponse.map((trigger: any) => ({
+      return {
+        itemid: item.itemid,
+        name: item.name,
+        key: item.key_,
+        lastvalue: formattedValue,
+        rawValue: lastValue,
+        lastclock: lastClock?.toISOString() || null,
+        lastCheckFormatted: lastClock ? lastClock.toLocaleString() : 'Never',
+        units: units,
+        status: item.status === '0' ? 'active' : 'disabled',
+        applications: item.applications?.map((app: any) => app.name) || [],
+        type: this.getMetricType(item.key_)
+      }
+    })
+
+    // Format alerts
+    const alerts = (alertsResponse || []).map((trigger: any) => ({
       id: trigger.triggerid,
-      description: trigger.description,
+      name: trigger.description,
       severity: this.mapPriority(trigger.priority),
-      status: trigger.status === '0' ? 'enabled' : 'disabled',
-      lastChange: new Date(parseInt(trigger.lastchange) * 1000).toISOString()
+      status: trigger.value === '1' ? 'active' : 'resolved',
+      lastChange: trigger.lastchange ? new Date(parseInt(trigger.lastchange) * 1000).toISOString() : null
     }))
 
+    // Calculate operational status
+    const adminStatusItems = items.filter(item => item.key.includes('ifAdminStatus'))
+    const operStatusItems = items.filter(item => item.key.includes('ifOperStatus'))
+    
+    const operationalStatus = {
+      adminStatus: adminStatusItems.length > 0 ? adminStatusItems[0].rawValue : 'unknown',
+      operStatus: operStatusItems.length > 0 ? operStatusItems[0].rawValue : 'unknown',
+      lastStatusChange: items.find(item => item.key.includes('ifOperStatus'))?.lastclock || null
+    }
+
     // Calculate uptime (if available from system.uptime item)
-    const uptimeItem = itemsResponse.find((item: any) => 
-      item.key_.includes('system.uptime') || item.key_.includes('uptime')
+    const uptimeItem = items.find(item => 
+      item.key.includes('system.uptime') || item.key.includes('uptime')
     )
-    const uptime = uptimeItem ? parseInt(uptimeItem.lastvalue || '0') : 0
+    const uptime = uptimeItem ? parseInt(uptimeItem.rawValue || '0') : 0
 
     return {
       id: host.hostid,
@@ -372,8 +419,15 @@ class ZabbixAPI {
       lastCheck: new Date().toISOString(),
       groups: host.groups?.map((g: any) => g.name) || [],
       templates: host.parentTemplates?.map((t: any) => t.name) || [],
-      currentMetrics: currentMetrics,
-      activeAlerts: activeAlerts
+      interfaces: host.interfaces || [],
+      items: items,
+      alerts: alerts,
+      operationalStatus: operationalStatus,
+      checks: {
+        total: items.length,
+        active: items.filter((item: any) => item.status === 'active').length,
+        alerts: alerts.filter((alert: any) => alert.status === 'active').length
+      }
     }
   }
 
