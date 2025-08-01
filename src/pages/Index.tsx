@@ -5,6 +5,7 @@ import { HostStatusCard } from "@/components/dashboard/HostStatusCard";
 import { AlertsCard } from "@/components/dashboard/AlertsCard";
 import { ChartPlaceholder } from "@/components/dashboard/ChartPlaceholder";
 import { ChatButton } from "@/components/dashboard/ChatButton";
+import { Footer } from "@/components/dashboard/Footer";
 
 const Index = () => {
   // Mock data - será substituído por dados reais da API do Zabbix
@@ -198,6 +199,9 @@ const Index = () => {
 
       {/* Chat Button */}
       <ChatButton />
+      
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };

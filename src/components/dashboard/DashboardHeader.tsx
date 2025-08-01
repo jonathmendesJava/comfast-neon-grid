@@ -13,7 +13,7 @@ export const DashboardHeader = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  COMFAST
+                  Fios Tecnologia
                 </h1>
                 <p className="text-sm text-muted-foreground">Monitoramento de Redes</p>
               </div>
