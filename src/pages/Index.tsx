@@ -1,5 +1,5 @@
 import React from "react";
-import { Cpu, HardDrive, Network, Activity, Clock, Server } from "lucide-react";
+import { Cpu, HardDrive, Network, Activity, Clock, Server, MemoryStick } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { EnhancedMetricCard } from "@/components/dashboard/EnhancedMetricCard";
@@ -11,6 +11,7 @@ import { ChartPlaceholder } from "@/components/dashboard/ChartPlaceholder";
 import { ChatButton } from "@/components/dashboard/ChatButton";
 import { Footer } from "@/components/dashboard/Footer";
 import { useZabbixHosts, useZabbixAlerts, useZabbixMetrics } from "@/hooks/useZabbixData";
+import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 import { LoadingSpinner } from "@/components/dashboard/LoadingSpinner";
 
 const Index = () => {
@@ -21,6 +22,9 @@ const Index = () => {
   const { data: zabbixHosts, isLoading: hostsLoading, error: hostsError } = useZabbixHosts();
   const { data: zabbixAlerts, isLoading: alertsLoading, error: alertsError } = useZabbixAlerts();
   const { data: zabbixMetrics, isLoading: metricsLoading, error: metricsError } = useZabbixMetrics();
+  
+  // Hook para métricas calculadas do dashboard
+  const { dashboardCards } = useDashboardMetrics();
 
   // Mapear dados do Zabbix para o formato esperado pelos componentes
   const hosts = zabbixHosts?.map(host => ({
@@ -147,57 +151,59 @@ const Index = () => {
           </div>
         </section>
 
-        {/* Métricas Adiciais */}
+        {/* Métricas em Tempo Real */}
         <section>
-          <h2 className="text-xl font-semibold mb-6 text-foreground">Métricas Detalhadas</h2>
+          <h2 className="text-xl font-semibold mb-6 text-foreground">Métricas em Tempo Real</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <MetricCard
               title="Hosts Online"
-              value={42}
+              value={dashboardCards.hostsOnline.value}
               icon={Server}
-              status="normal"
+              status={dashboardCards.hostsOnline.status}
+              trend={dashboardCards.hostsOnline.trend}
               className="col-span-1"
             />
             <MetricCard
               title="Hosts Offline"
-              value={3}
+              value={dashboardCards.hostsOffline.value}
               icon={Server}
-              status="critical"
+              status={dashboardCards.hostsOffline.status}
+              trend={dashboardCards.hostsOffline.trend}
               className="col-span-1"
             />
             <MetricCard
               title="Alertas Ativos"
-              value={7}
+              value={dashboardCards.activeAlerts.value}
               icon={Activity}
-              status="warning"
+              status={dashboardCards.activeAlerts.status}
+              trend={dashboardCards.activeAlerts.trend}
               className="col-span-1"
             />
             <MetricCard
               title="Tempo Médio Resposta"
-              value={145}
-              unit="ms"
+              value={dashboardCards.avgResponseTime.value}
+              unit={dashboardCards.avgResponseTime.unit}
               icon={Clock}
-              status="normal"
+              status={dashboardCards.avgResponseTime.status}
+              trend={dashboardCards.avgResponseTime.trend}
               className="col-span-1"
             />
             <MetricCard
-              title="Throughput"
-              value={8.4}
-              unit="Gbps"
+              title="Throughput Total"
+              value={dashboardCards.throughput.value}
+              unit={dashboardCards.throughput.unit}
               icon={Network}
-              trend="up"
-              trendValue="+12%"
-              status="normal"
+              status={dashboardCards.throughput.status}
+              trend={dashboardCards.throughput.trend}
               className="col-span-1"
             />
             <MetricCard
               title="Pacotes Perdidos"
-              value={0.02}
-              unit="%"
+              value={dashboardCards.packetLoss.value}
+              unit={dashboardCards.packetLoss.unit}
               icon={Network}
-              trend="down"
-              trendValue="-0.01%"
-              status="normal"
+              status={dashboardCards.packetLoss.status}
+              trend={dashboardCards.packetLoss.trend}
               className="col-span-1"
             />
           </div>
