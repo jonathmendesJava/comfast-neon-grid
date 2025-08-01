@@ -239,20 +239,37 @@ export class ZabbixService {
       }
 
       if (!result.success) {
-        console.error('❌ Erro do Zabbix:', result.error);
+        console.warn('⚠️ ZabbixService: Resposta parcial ou erro do Zabbix:', result.error);
+        
+        // Se temos dados parciais, retorna com flag de erro
+        if (result.data) {
+          console.log('📦 ZabbixService: Retornando dados parciais com aviso');
+          return {
+            ...result.data,
+            _isPartialData: true,
+            error: result.error || 'Algumas informações podem estar indisponíveis'
+          };
+        }
+        
         throw new Error(result.error || 'Erro desconhecido do Zabbix');
       }
 
-      console.log(`✅ ZabbixService: Dados do host carregados com sucesso`);
+      console.log(`✅ ZabbixService: Dados do host carregados completamente`);
       return result.data || {};
     } catch (error) {
-      console.error('❌ ZabbixService: Erro ao buscar detalhes do host:', error);
+      console.error('❌ ZabbixService: Erro crítico ao buscar detalhes do host:', error);
       
-      // Retornar estrutura mínima para evitar quebra do frontend
+      // Apenas para erros de conectividade real, lance o erro
+      if (error instanceof Error && error.message.includes('Erro de conexão')) {
+        throw error;
+      }
+      
+      // Para outros casos, retorna estrutura mínima com dados básicos
       return {
         host: { name: 'Host indisponível', status: 'unknown' },
         items: [],
         alerts: [],
+        _isPartialData: true,
         error: error instanceof Error ? error.message : 'Erro desconhecido'
       };
     }

@@ -76,6 +76,7 @@ interface HostDetails {
     alerts: number;
   };
   error?: string; // Propriedade para indicar erros nos dados carregados
+  _isPartialData?: boolean; // Flag para indicar dados parciais
 }
 
 const fetchHostDetails = async (hostId: string): Promise<HostDetails> => {
@@ -216,21 +217,33 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
               </div>
             </div>
           ) : hostDetails ? (
-            // Verificar se há erro nos dados carregados
-            hostDetails.error ? (
-              <div className="flex flex-col items-center justify-center h-64 text-yellow-600">
-                <AlertTriangle className="w-8 h-8 mb-2" />
-                <div className="text-center space-y-2">
-                  <p className="font-medium">Dados parciais carregados</p>
-                  <p className="text-sm text-muted-foreground">
-                    {hostDetails.error}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Algumas informações podem estar indisponíveis
-                  </p>
+            // Mostrar dados se disponíveis, mesmo com avisos
+            <>
+              {/* Aviso de dados parciais se aplicável */}
+              {hostDetails.error && (
+                <div className="mb-4 p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-yellow-800">
+                        {hostDetails._isPartialData ? 'Dados parciais carregados' : 'Erro ao carregar dados'}
+                      </h4>
+                      <p className="text-sm text-yellow-700 mt-1">{hostDetails.error}</p>
+                      <Button 
+                        onClick={() => refetch()}
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                      >
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Tentar novamente
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ) : (
+              )}
+              
+              {/* Conteúdo principal dos dados */}
             <Tabs defaultValue="overview" className="w-full">
               <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="overview">Visão Geral</TabsTrigger>
@@ -765,7 +778,7 @@ export const HostDetailsModal = ({ host, isOpen, onClose }: HostDetailsModalProp
                 </div>
               </TabsContent>
             </Tabs>
-            )
+            </>
           ) : null}
         </div>
       </DialogContent>
