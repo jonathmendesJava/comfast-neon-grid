@@ -308,13 +308,14 @@ class ZabbixAPI {
   async getHostDetails(hostId: string): Promise<any> {
     console.log(`Fetching details for host: ${hostId}`)
     
-    // Validate hostId
-    if (!hostId || hostId === 'undefined' || hostId === 'null') {
+    // Validate and convert hostId
+    const numericHostId = Number(hostId)
+    if (!hostId || hostId === 'undefined' || hostId === 'null' || isNaN(numericHostId)) {
       console.error(`Invalid hostId: ${hostId}`)
       throw new Error(`Invalid hostId: ${hostId}`)
     }
 
-    console.log(`Making host.get request for hostId: ${hostId}`)
+    console.log(`Making host.get request for hostId: ${numericHostId}`)
     
     // Get host basic information
     const hostResponse = await this.makeRequest('host.get', {
@@ -322,35 +323,55 @@ class ZabbixAPI {
       selectInterfaces: ['interfaceid', 'main', 'type', 'useip', 'ip', 'dns', 'port'],
       selectGroups: ['name'],
       selectParentTemplates: ['name'],
-      hostids: [hostId]
+      hostids: [numericHostId]
     })
 
     console.log(`Host response:`, JSON.stringify(hostResponse, null, 2))
 
     if (!hostResponse || hostResponse.length === 0) {
-      console.error(`Host not found for ID: ${hostId}`)
-      throw new Error(`Host with ID ${hostId} not found`)
+      console.error(`Host not found for ID: ${numericHostId}`)
+      throw new Error(`Host with ID ${numericHostId} not found`)
     }
 
     const host = hostResponse[0]
     console.log(`Found host: ${host.name}`)
 
-    // Get ALL items for this host (like Zabbix Recent data)
-    console.log(`Getting items for host: ${hostId}`)
-    const itemsResponse = await this.makeRequest('item.get', {
-      output: ['itemid', 'name', 'key_', 'lastvalue', 'lastclock', 'units', 'status'],
-      hostids: [hostId],
-      monitored: true,
-      webitems: false,
-      sortfield: 'name'
-    })
+    // Get items with safe parameters first
+    console.log(`Getting items for host: ${numericHostId}`)
+    let itemsResponse
+    
+    try {
+      // First attempt: safe parameters without units and status
+      itemsResponse = await this.makeRequest('item.get', {
+        output: ['itemid', 'name', 'key_', 'lastvalue', 'lastclock'],
+        hostids: [numericHostId],
+        monitored: true,
+        webitems: false,
+        sortfield: 'name'
+      })
+      console.log(`✅ Items loaded successfully with safe parameters: ${itemsResponse?.length || 0} items`)
+    } catch (error) {
+      console.warn(`⚠️ Safe parameters failed, trying fallback with extend...`)
+      
+      try {
+        // Fallback: use extend output
+        itemsResponse = await this.makeRequest('item.get', {
+          hostids: [numericHostId],
+          output: 'extend'
+        })
+        console.log(`✅ Items loaded with fallback: ${itemsResponse?.length || 0} items`)
+      } catch (fallbackError) {
+        console.error(`❌ Both attempts failed:`, fallbackError)
+        throw new Error(`Unable to load items for host ${numericHostId}`)
+      }
+    }
 
     console.log(`Items response count: ${itemsResponse?.length || 0}`)
 
     // Get active alerts for this host
     const alertsResponse = await this.makeRequest('trigger.get', {
       output: ['triggerid', 'description', 'priority', 'status', 'lastchange', 'value'],
-      hostids: [hostId],
+      hostids: [numericHostId],
       monitored: true,
       active: true,
       expandDescription: true,
