@@ -10,170 +10,190 @@ export interface PredictionResult {
   lastUpdate: string;
 }
 
-export const useInstabilityPrediction = (metrics: CriticalMetrics | null): PredictionResult => {
+export const useInstabilityPrediction = (data: any): PredictionResult => {
   return useMemo(() => {
-    if (!metrics || !metrics.ping.length) {
+    if (!data || !data.metrics) {
       return {
-        riskLevel: 'low',
+        riskLevel: 'low' as const,
         riskScore: 0,
         etaMinutes: null,
         factors: [],
-        recommendation: 'Aguardando dados...',
+        recommendation: 'Sem dados suficientes para análise',
         lastUpdate: new Date().toISOString()
       };
     }
 
-    const { ping, latency, cpu, memory } = metrics;
+    const { ping, latency, cpu, memory } = data.metrics;
     
-    // Get recent data (last 15 minutes)
-    const now = Date.now();
-    const recent15min = now - (15 * 60 * 1000);
-    const recent5min = now - (5 * 60 * 1000);
-    
-    const recentPing = ping.filter(p => p.timestamp >= recent15min);
-    const recentLatency = latency.filter(l => l.timestamp >= recent15min);
-    const recentCpu = cpu.filter(c => c.timestamp >= recent15min);
-    
-    const veryRecentPing = ping.filter(p => p.timestamp >= recent5min);
-    
+    // Se não há dados suficientes, retorna risco baixo
+    if (ping.length === 0 && latency.length === 0 && cpu.length === 0 && memory.length === 0) {
+      return {
+        riskLevel: 'low' as const,
+        riskScore: 5,
+        etaMinutes: null,
+        factors: ['Métricas insuficientes para análise'],
+        recommendation: 'Monitoramento insuficiente detectado',
+        lastUpdate: new Date().toISOString()
+      };
+    }
+
     let riskScore = 0;
     const factors: string[] = [];
     let etaMinutes: number | null = null;
-    
-    // Ping analysis - most critical factor
-    if (recentPing.length > 0) {
-      const pingFailures = recentPing.filter(p => p.value === 0).length;
-      const pingFailureRate = pingFailures / recentPing.length;
+
+    // 1️⃣ Análise de Ping / Disponibilidade (peso: 40 pontos)
+    // Busca por perda de pacotes nos últimos 5-10 minutos
+    if (ping.length > 0) {
+      const recentPing = ping.slice(-20); // Últimos 20 registros para análise de tendência
+      const last5Minutes = recentPing.slice(-5); // Últimos 5 minutos críticos
       
-      if (pingFailureRate >= 0.5) {
-        riskScore += 60;
-        factors.push('Alto índice de falhas de ping');
-        etaMinutes = 2; // Critical - likely to fail soon
-      } else if (pingFailureRate >= 0.3) {
+      // Calcular % de perda de pacotes
+      const pingFailures = last5Minutes.filter((p: any) => p.value === 0).length;
+      const pingLossPercentage = (pingFailures / last5Minutes.length) * 100;
+      
+      // Detectar quedas recentes
+      const consecutiveFailures = last5Minutes.reverse().findIndex((p: any) => p.value === 1);
+      const isDownNow = last5Minutes[0]?.value === 0;
+      
+      if (isDownNow && consecutiveFailures >= 3) {
         riskScore += 40;
-        factors.push('Falhas intermitentes de ping');
-        etaMinutes = 5;
-      } else if (pingFailureRate > 0) {
-        riskScore += 20;
-        factors.push('Falhas ocasionais de ping');
-      }
-      
-      // Check for consecutive failures in very recent data
-      if (veryRecentPing.length >= 3) {
-        const lastThreePings = veryRecentPing.slice(-3);
-        const consecutiveFailures = lastThreePings.every(p => p.value === 0);
-        
-        if (consecutiveFailures) {
-          riskScore += 30;
-          factors.push('3+ falhas consecutivas de ping');
-          etaMinutes = Math.min(etaMinutes || 1, 1);
-        }
-      }
-    }
-    
-    // Latency analysis
-    if (recentLatency.length > 0) {
-      const avgLatency = recentLatency.reduce((sum, l) => sum + l.value, 0) / recentLatency.length;
-      const maxLatency = Math.max(...recentLatency.map(l => l.value));
-      
-      if (avgLatency > 200) {
+        factors.push(`Host offline há ${consecutiveFailures} intervalos consecutivos`);
+        etaMinutes = 0; // Já está em problema
+      } else if (pingLossPercentage >= 60) {
+        riskScore += 35;
+        factors.push(`Perda crítica de conectividade (${pingLossPercentage.toFixed(0)}%)`);
+        etaMinutes = 2;
+      } else if (pingLossPercentage >= 40) {
         riskScore += 25;
-        factors.push(`Latência média alta (${avgLatency.toFixed(1)}ms)`);
-        etaMinutes = etaMinutes ? Math.min(etaMinutes, 10) : 10;
-      } else if (avgLatency > 100) {
+        factors.push(`Perda alta de conectividade (${pingLossPercentage.toFixed(0)}%)`);
+        etaMinutes = 5;
+      } else if (pingLossPercentage >= 20) {
         riskScore += 15;
-        factors.push(`Latência elevada (${avgLatency.toFixed(1)}ms)`);
-      }
-      
-      if (maxLatency > 500) {
-        riskScore += 20;
-        factors.push(`Picos de latência extrema (${maxLatency.toFixed(1)}ms)`);
-      }
-      
-      // Check for increasing latency trend
-      if (recentLatency.length >= 5) {
-        const firstHalf = recentLatency.slice(0, Math.floor(recentLatency.length / 2));
-        const secondHalf = recentLatency.slice(Math.floor(recentLatency.length / 2));
-        
-        const firstAvg = firstHalf.reduce((sum, l) => sum + l.value, 0) / firstHalf.length;
-        const secondAvg = secondHalf.reduce((sum, l) => sum + l.value, 0) / secondHalf.length;
-        
-        if (secondAvg > firstAvg * 1.3) {
-          riskScore += 15;
-          factors.push('Tendência de aumento na latência');
-          etaMinutes = etaMinutes ? Math.min(etaMinutes, 15) : 15;
-        }
+        factors.push(`Perda moderada de conectividade (${pingLossPercentage.toFixed(0)}%)`);
+        etaMinutes = 15;
+      } else if (pingLossPercentage > 0) {
+        riskScore += 5;
+        factors.push(`Perda esporádica detectada (${pingLossPercentage.toFixed(0)}%)`);
       }
     }
-    
-    // CPU analysis
-    if (recentCpu.length > 0) {
-      const avgCpu = recentCpu.reduce((sum, c) => sum + c.value, 0) / recentCpu.length;
-      const maxCpu = Math.max(...recentCpu.map(c => c.value));
+
+    // 2️⃣ Análise de Latência (peso: 30 pontos)
+    // Detecta picos súbitos de latência que indicam instabilidade
+    if (latency.length > 0) {
+      const recentLatency = latency.slice(-10);
+      const avgLatency = recentLatency.reduce((sum: number, l: any) => sum + l.value, 0) / recentLatency.length;
+      const maxLatency = Math.max(...recentLatency.map((l: any) => l.value));
+      const minLatency = Math.min(...recentLatency.map((l: any) => l.value));
       
-      if (avgCpu > 90) {
+      // Calcular variação % nos últimos minutos
+      const latencyVariation = avgLatency > 0 ? ((maxLatency - minLatency) / avgLatency) * 100 : 0;
+      
+      // Detectar picos de latência (valores > 2x a média)
+      const latencySpikes = recentLatency.filter((l: any) => l.value > avgLatency * 2).length;
+      
+      if (maxLatency > 2000) { // > 2 segundos = crítico
+        riskScore += 30;
+        factors.push(`Latência crítica detectada (${maxLatency.toFixed(0)}ms)`);
+        etaMinutes = Math.min(etaMinutes || 300, 5);
+      } else if (maxLatency > 1000) { // > 1 segundo = alto
         riskScore += 20;
-        factors.push(`CPU crítica (${avgCpu.toFixed(1)}%)`);
-        etaMinutes = etaMinutes ? Math.min(etaMinutes, 20) : 20;
-      } else if (avgCpu > 80) {
+        factors.push(`Latência muito alta (${maxLatency.toFixed(0)}ms)`);
+        etaMinutes = Math.min(etaMinutes || 300, 10);
+      } else if (latencySpikes >= 5) { // Muitos picos = instabilidade
+        riskScore += 15;
+        factors.push(`Instabilidade de latência (${latencySpikes} picos detectados)`);
+        etaMinutes = Math.min(etaMinutes || 300, 30);
+      } else if (latencyVariation > 200) { // Variação muito alta
         riskScore += 10;
-        factors.push(`CPU alta (${avgCpu.toFixed(1)}%)`);
+        factors.push(`Latência instável (variação de ${latencyVariation.toFixed(0)}%)`);
+        etaMinutes = Math.min(etaMinutes || 300, 60);
+      } else if (avgLatency > 500) { // Latência base alta
+        riskScore += 5;
+        factors.push(`Latência elevada (média: ${avgLatency.toFixed(0)}ms)`);
       }
+    }
+
+    // 3️⃣ Análise de CPU (peso: 15 pontos)
+    // Uso de CPU acima de thresholds críticos
+    if (cpu.length > 0) {
+      const recentCpu = cpu.slice(-5); // Últimos 5 minutos
+      const avgCpu = recentCpu.reduce((sum: number, c: any) => sum + c.value, 0) / recentCpu.length;
+      const maxCpu = Math.max(...recentCpu.map((c: any) => c.value));
       
-      if (maxCpu > 95) {
+      // Detectar CPU sustentada vs picos
+      const highCpuCount = recentCpu.filter((c: any) => c.value > 80).length;
+      
+      if (avgCpu > 95) {
         riskScore += 15;
-        factors.push(`Picos de CPU extrema (${maxCpu.toFixed(1)}%)`);
+        factors.push(`CPU crítica sustentada (${avgCpu.toFixed(1)}%)`);
+        etaMinutes = Math.min(etaMinutes || 300, 10);
+      } else if (avgCpu > 90) {
+        riskScore += 12;
+        factors.push(`CPU muito alta (${avgCpu.toFixed(1)}%)`);
+        etaMinutes = Math.min(etaMinutes || 300, 20);
+      } else if (highCpuCount >= 3) {
+        riskScore += 8;
+        factors.push(`CPU frequentemente alta (${highCpuCount}/5 intervalos > 80%)`);
+        etaMinutes = Math.min(etaMinutes || 300, 60);
+      } else if (maxCpu > 85) {
+        riskScore += 5;
+        factors.push(`Picos de CPU detectados (máx: ${maxCpu.toFixed(1)}%)`);
       }
     }
-    
-    // Memory analysis (if available)
-    if (recentCpu.length > 0 && memory.length > 0) {
-      const recentMemory = memory.filter(m => m.timestamp >= recent15min);
-      if (recentMemory.length > 0) {
-        const avgMemory = recentMemory.reduce((sum, m) => sum + m.value, 0) / recentMemory.length;
-        
-        if (avgMemory > 90) {
-          riskScore += 15;
-          factors.push(`Memória crítica (${avgMemory.toFixed(1)}%)`);
-        } else if (avgMemory > 85) {
-          riskScore += 8;
-          factors.push(`Memória alta (${avgMemory.toFixed(1)}%)`);
-        }
+
+    // 4️⃣ Análise de Memória (peso: 15 pontos)
+    // Uso de memória acima de thresholds críticos
+    if (memory.length > 0) {
+      const recentMemory = memory.slice(-5);
+      const avgMemory = recentMemory.reduce((sum: number, m: any) => sum + m.value, 0) / recentMemory.length;
+      const maxMemory = Math.max(...recentMemory.map((m: any) => m.value));
+      
+      // Detectar memória sustentada vs picos
+      const highMemoryCount = recentMemory.filter((m: any) => m.value > 85).length;
+      
+      if (avgMemory > 98) {
+        riskScore += 15;
+        factors.push(`Memória crítica (${avgMemory.toFixed(1)}%)`);
+        etaMinutes = Math.min(etaMinutes || 300, 15);
+      } else if (avgMemory > 95) {
+        riskScore += 12;
+        factors.push(`Memória muito alta (${avgMemory.toFixed(1)}%)`);
+        etaMinutes = Math.min(etaMinutes || 300, 30);
+      } else if (highMemoryCount >= 3) {
+        riskScore += 8;
+        factors.push(`Memória frequentemente alta (${highMemoryCount}/5 intervalos > 85%)`);
+        etaMinutes = Math.min(etaMinutes || 300, 90);
+      } else if (maxMemory > 90) {
+        riskScore += 5;
+        factors.push(`Picos de memória detectados (máx: ${maxMemory.toFixed(1)}%)`);
       }
     }
-    
-    // Determine risk level
+
+    // Classificação de risco (verde, amarelo, laranja, vermelho)
     let riskLevel: 'low' | 'medium' | 'high' | 'critical';
+    let recommendation: string;
+
     if (riskScore >= 80) {
       riskLevel = 'critical';
+      recommendation = 'CRÍTICO: Intervenção imediata necessária - sistema instável';
     } else if (riskScore >= 50) {
       riskLevel = 'high';
+      recommendation = 'ALTO: Monitoramento intensivo e ação preventiva recomendada';
     } else if (riskScore >= 25) {
       riskLevel = 'medium';
+      recommendation = 'MÉDIO: Atenção requerida - monitorar tendências';
     } else {
       riskLevel = 'low';
+      recommendation = 'BAIXO: Sistema operando dentro dos parâmetros normais';
     }
-    
-    // Generate recommendation
-    let recommendation: string;
-    if (riskLevel === 'critical') {
-      recommendation = 'AÇÃO IMEDIATA: Verificar conectividade e recursos do host';
-    } else if (riskLevel === 'high') {
-      recommendation = 'Monitorar de perto e considerar manutenção preventiva';
-    } else if (riskLevel === 'medium') {
-      recommendation = 'Acompanhar evolução das métricas';
-    } else {
-      recommendation = 'Sistema operando normalmente';
-    }
-    
+
     return {
       riskLevel,
-      riskScore: Math.min(riskScore, 100),
+      riskScore: Math.min(100, riskScore), // Cap at 100
       etaMinutes,
       factors,
       recommendation,
       lastUpdate: new Date().toISOString()
     };
-    
-  }, [metrics]);
+  }, [data]);
 };

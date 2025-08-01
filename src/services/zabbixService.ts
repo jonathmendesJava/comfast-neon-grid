@@ -236,6 +236,35 @@ export class ZabbixService {
       throw error;
     }
   }
+
+  /**
+   * Busca últimos valores de todos os itens de um host
+   * @param hostId ID do host
+   * @returns Promise<any> Últimos valores dos itens
+   */
+  async getLatestValues(hostId: string): Promise<any> {
+    try {
+      const { data: result, error } = await supabase.functions.invoke('zabbix-proxy', {
+        body: { 
+          action: 'get-latest-values',
+          hostId
+        }
+      });
+
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`);
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Unknown error from Zabbix proxy');
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Erro ao buscar últimos valores:', error);
+      throw error;
+    }
+  }
 }
 
 export const zabbixService = new ZabbixService();
